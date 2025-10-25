@@ -13,7 +13,7 @@ async def test_list_answers_empty(mock_interaction, tmp_path):
     """Test listing answers when none exist."""
     storage_service.DATA_DIR = tmp_path
     
-    await list_answers_command.callback(list_answers_command, mock_interaction)
+    await list_answers_command.callback(mock_interaction)
     
     # Verify empty message
     call_args = mock_interaction.followup.send.call_args
@@ -30,7 +30,7 @@ async def test_list_answers_with_submissions(mock_interaction, tmp_path):
     answer_service.submit_answer(guild_id, "user1", "User1", "Answer 1")
     answer_service.submit_answer(guild_id, "user2", "User2", "Answer 2")
     
-    await list_answers_command.callback(list_answers_command, mock_interaction)
+    await list_answers_command.callback(mock_interaction)
     
     # Verify answer list
     call_args = mock_interaction.followup.send.call_args
@@ -60,7 +60,7 @@ async def test_reset_answers(mock_interaction, tmp_path):
     assert file_path.exists()
     
     # Reset
-    await reset_answers_command.callback(reset_answers_command, mock_interaction)
+    await reset_answers_command.callback(mock_interaction)
     
     # Verify session cleared
     session_after = answer_service.get_session(guild_id)
@@ -108,7 +108,7 @@ async def test_full_workflow(mock_interaction, tmp_path):
     answer_service.submit_answer(guild_id, "user2", "User2", "Answer 2")
     
     # List answers
-    await list_answers_command.callback(list_answers_command, mock_interaction)
+    await list_answers_command.callback(mock_interaction)
     message1 = mock_interaction.followup.send.call_args[0][0]
     assert "User1" in message1
     assert "User2" in message1
@@ -121,7 +121,7 @@ async def test_full_workflow(mock_interaction, tmp_path):
     # Reset session
     session = answer_service.get_session(guild_id)
     storage_service.save_session_to_disk(guild_id, session)
-    await reset_answers_command.callback(reset_answers_command, mock_interaction)
+    await reset_answers_command.callback(mock_interaction)
     
     # Reset mock again
     mock_interaction.reset_mock()
@@ -129,6 +129,6 @@ async def test_full_workflow(mock_interaction, tmp_path):
     mock_interaction.followup = AsyncMock()
     
     # List answers again (should be empty)
-    await list_answers_command.callback(list_answers_command, mock_interaction)
+    await list_answers_command.callback(mock_interaction)
     message2 = mock_interaction.followup.send.call_args[0][0]
     assert "No answers submitted yet" in message2

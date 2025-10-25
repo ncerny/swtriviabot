@@ -31,7 +31,7 @@ async def test_submit_answer_update_existing(mock_interaction, tmp_path):
     storage_service.DATA_DIR = tmp_path
     
     # First submission
-    await answer_command.callback(answer_command, mock_interaction, text="Paris")
+    await answer_command.callback(mock_interaction, text="Paris")
     
     # Reset mock
     mock_interaction.reset_mock()
@@ -39,7 +39,7 @@ async def test_submit_answer_update_existing(mock_interaction, tmp_path):
     mock_interaction.followup = AsyncMock()
     
     # Second submission (update)
-    await answer_command.callback(answer_command, mock_interaction, text="France")
+    await answer_command.callback(mock_interaction, text="France")
     
     # Verify update message
     call_args = mock_interaction.followup.send.call_args
@@ -51,7 +51,7 @@ async def test_submit_empty_answer(mock_interaction, tmp_path):
     """Test that empty answers are rejected."""
     storage_service.DATA_DIR = tmp_path
     
-    await answer_command.callback(answer_command, mock_interaction, text="   ")
+    await answer_command.callback(mock_interaction, text="   ")
     
     # Verify error message
     call_args = mock_interaction.followup.send.call_args
@@ -64,7 +64,7 @@ async def test_submit_answer_creates_session_file(mock_interaction, tmp_path):
     """Test that submitting an answer creates a session file on disk."""
     storage_service.DATA_DIR = tmp_path
     
-    await answer_command.callback(answer_command, mock_interaction, text="Test answer")
+    await answer_command.callback(mock_interaction, text="Test answer")
     
     # Verify file was created
     guild_id = str(mock_interaction.guild_id)
@@ -78,12 +78,12 @@ async def test_multiple_users_submit_answers(mock_interaction, tmp_path):
     storage_service.DATA_DIR = tmp_path
     
     # User 1 submits
-    await answer_command.callback(answer_command, mock_interaction, text="Answer 1")
+    await answer_command.callback(mock_interaction, text="Answer 1")
     
     # User 2 submits
     mock_interaction.user.id = 999888777666
     mock_interaction.user.display_name = "User2"
-    await answer_command.callback(answer_command, mock_interaction, text="Answer 2")
+    await answer_command.callback(mock_interaction, text="Answer 2")
     
     # Verify both answers are stored
     guild_id = str(mock_interaction.guild_id)
@@ -97,7 +97,7 @@ async def test_dm_submission_rejected(mock_interaction, tmp_path):
     storage_service.DATA_DIR = tmp_path
     mock_interaction.guild_id = None
     
-    await answer_command.callback(answer_command, mock_interaction, text="Test answer")
+    await answer_command.callback(mock_interaction, text="Test answer")
     
     # Verify error message about DMs
     call_args = mock_interaction.followup.send.call_args
