@@ -4,6 +4,7 @@ import logging
 import os
 import signal
 import sys
+import time
 from typing import NoReturn
 
 import discord
@@ -18,6 +19,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.services import answer_service, storage_service
 from src.commands.list_answers import list_answers_command
 from src.commands.post_question import post_question_command, AnswerButton
+from src.commands.metrics import metrics_command
+from src.utils.performance import get_metrics
 
 # Configure logging
 logging.basicConfig(
@@ -50,6 +53,7 @@ tree = app_commands.CommandTree(client)
 # Register commands
 tree.add_command(list_answers_command)
 tree.add_command(post_question_command)
+tree.add_command(metrics_command)
 
 
 @client.event
@@ -97,7 +101,16 @@ async def on_ready() -> None:
     print("🎮 Bot is ready!")
 
 
-@tree.error
+@client.event
+async def on_interaction(interaction: discord.Interaction) -> None:
+    """Track command performance metrics.
+
+    Args:
+        interaction: Discord interaction object
+    """
+    if interaction.type == discord.InteractionType.application_command:
+        # Record command execution start time
+        interaction.extras["start_time"] = time.perf_counter()
 
 
 @tree.error
@@ -110,6 +123,12 @@ async def on_app_command_error(
         interaction: Discord interaction object
         error: Error that occurred
     """
+    # Record performance metrics
+    if "start_time" in interaction.extras:
+        elapsed_time = (time.perf_counter() - interaction.extras["start_time"]) * 1000
+        command_name = interaction.command.name if interaction.command else "unknown"
+        get_metrics().record_command(command_name, elapsed_time, success=False)
+    
     logger.error(f"Command error in {interaction.command.name if interaction.command else 'unknown'}: {error}", exc_info=True)
 
     # Handle specific error types
