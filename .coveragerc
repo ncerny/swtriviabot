@@ -1,0 +1,17 @@
+[run]
+source = src
+omit =
+    */tests/*
+    */__pycache__/*
+    */site-packages/*
+    src/bot.py
+    src/commands/post_question.py
+
+[report]
+precision = 2
+show_missing = True
+skip_covered = False
+fail_under = 80
+
+[html]
+directory = htmlcov
