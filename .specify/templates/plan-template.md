@@ -29,9 +29,31 @@
 
 ## Constitution Check
 
-*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+_GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
-[Gates determined based on constitution file]
+### Code Quality
+
+- [ ] Static analysis configured (linter, formatter)
+- [ ] Documentation standards defined for public interfaces
+- [ ] Complexity thresholds identified (cyclomatic complexity ≤10 or justified)
+
+### Testing Standards
+
+- [ ] Test strategy defined (unit/integration/regression levels)
+- [ ] Coverage thresholds established (85% statements, 90% critical paths)
+- [ ] Red-Green-Refactor workflow planned for new features
+
+### User Experience Consistency
+
+- [ ] UX patterns and terminology defined
+- [ ] Error message standards documented
+- [ ] Accessibility requirements identified (if applicable)
+
+### Performance Requirements
+
+- [ ] Performance budgets defined (latency, memory, throughput)
+- [ ] Benchmark approach planned (baseline measurements, trend tracking)
+- [ ] Performance regression thresholds established (≤5% degradation)
 
 ## Project Structure
 
@@ -48,6 +70,7 @@ specs/[###-feature]/
 ```
 
 ### Source Code (repository root)
+
 <!--
   ACTION REQUIRED: Replace the placeholder tree below with the concrete layout
   for this feature. Delete unused options and expand the chosen structure with
@@ -98,7 +121,7 @@ directories captured above]
 
 > **Fill ONLY if Constitution Check has violations that must be justified**
 
-| Violation | Why Needed | Simpler Alternative Rejected Because |
-|-----------|------------|-------------------------------------|
-| [e.g., 4th project] | [current need] | [why 3 projects insufficient] |
-| [e.g., Repository pattern] | [specific problem] | [why direct DB access insufficient] |
+| Violation                  | Why Needed         | Simpler Alternative Rejected Because |
+| -------------------------- | ------------------ | ------------------------------------ |
+| [e.g., 4th project]        | [current need]     | [why 3 projects insufficient]        |
+| [e.g., Repository pattern] | [specific problem] | [why direct DB access insufficient]  |
