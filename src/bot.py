@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.services import answer_service, storage_service
 from src.commands.list_answers import list_answers_command
-from src.commands.post_question import post_question_command
+from src.commands.post_question import post_question_command, AnswerButton
 
 # Configure logging
 logging.basicConfig(
@@ -59,6 +59,11 @@ async def on_ready() -> None:
     logger.info(f"Logged in as {user_info}")
     print(f"✅ Logged in as {user_info}")
     print("---")
+
+    # Register persistent views for buttons (must be done on every startup)
+    client.add_view(AnswerButton())
+    logger.info("Registered persistent views")
+    print("🔘 Registered persistent views")
 
     # Load all sessions from disk into memory
     try:
