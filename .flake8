@@ -1,0 +1,29 @@
+[flake8]
+# Flake8 configuration for Discord Trivia Bot
+
+# Maximum line length
+max-line-length = 100
+
+# Maximum complexity (cyclomatic)
+max-complexity = 10
+
+# Exclude patterns
+exclude = 
+    .git,
+    __pycache__,
+    .venv,
+    venv,
+    build,
+    dist,
+    *.egg-info,
+    .pytest_cache,
+    .mypy_cache
+
+# Ignore specific rules
+ignore = 
+    E203,  # Whitespace before ':' (conflicts with black)
+    W503,  # Line break before binary operator (conflicts with black)
+
+# Per-file ignores
+per-file-ignores = 
+    __init__.py:F401  # Unused imports in __init__ files

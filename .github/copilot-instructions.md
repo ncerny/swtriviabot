@@ -1,0 +1,32 @@
+## General Instructions
+
+- Follow the project's constitutional principles as outlined in `.specify/memory/constitution.md`.
+- Ensure all code changes are covered by appropriate automated tests.
+- Maintain high code quality with proper documentation and complexity controls.
+- Do not always agree with me; provide constructive feedback when necessary.
+- Do not assume anything not explicitly stated in the provided context.
+- Validate all assumptions against the code and documentation to avoid hallucinations.
+
+## Code Handling
+
+- Use clear and concise language in all comments and documentation.
+- All commits MUST reference relevant issues or tasks.
+- All commits MUST follow conventional commit syntax.
+- All tasks MUST be committed as soon as possible after completion.
+
+## Python Specific Instructions
+
+- Virtual Environment MUST ALWAYS be used for dependency management.
+- Activate the virtual environment before running any scripts or tests.
+- Use `pip` to manage dependencies and ensure `requirements.txt` is updated accordingly.
+- Follow PEP 8 style guidelines for all Python code.
+
+## Active Technologies
+
+- Python 3.14+ + discord.py 2.3+, python-dotenv, pytest 7.4+, pytest-asyncio 0.21+ (001-discord-trivia-bot)
+- In-memory only (no database) - using native dict data structures keyed by guild_id (001-discord-trivia-bot)
+- Local disk persistence (JSON files) - session state keyed by guild_id, persisted to /data/ directory (001-discord-trivia-bot)
+
+## Recent Changes
+
+- 001-discord-trivia-bot: Added Python 3.14+ + discord.py 2.3+, python-dotenv, pytest 7.4+, pytest-asyncio 0.21+
