@@ -5,7 +5,6 @@ omit =
     */__pycache__/*
     */site-packages/*
     src/bot.py
-    src/commands/post_question.py
 
 [report]
 precision = 2

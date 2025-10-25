@@ -90,9 +90,9 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
                 message_parts.append(f"**Yesterday's Answer...**\n{self.yesterday_answer.value.strip()}")
 
             # Add yesterday's winners if provided
-            if self.yesterday_winners.value.strip() && self.yesterday_winners.value.strip() != "" && self.yesterday_winners.value.strip().lower() != "no winners":
+            if self.yesterday_winners.value.strip() and self.yesterday_winners.value.strip() != "" and self.yesterday_winners.value.strip().lower() != "no winners":
                 message_parts.append(f"Congrats to {self.yesterday_winners.value.strip()} your gold has been mailed. Thanks for playing!")
-            else
+            else:
                 message_parts.append(f"Unfortunately we had no winners, better luck next time!")
 
 
