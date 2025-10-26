@@ -1,9 +1,64 @@
 """Slash command handler for /post-question command."""
 
+import re
 import discord
 from discord import app_commands, ui
 
 from src.services import answer_service, storage_service
+
+
+def process_image_url(url: str) -> str:
+    """Process image URL to ensure it's a direct link to the image.
+    
+    Handles special cases like Tenor and Giphy URLs.
+    
+    Args:
+        url: The image URL provided by the user
+        
+    Returns:
+        A direct URL to the image file, or the original URL if no processing is needed
+    """
+    if not url or not url.strip():
+        return url
+        
+    url = url.strip()
+    
+    # Handle Tenor URLs - try to convert to GIF format
+    # Format: https://tenor.com/view/name-name-name-gif-12345678
+    # Tenor's actual GIF URLs are: https://media.tenor.com/HASH.gif or https://c.tenor.com/ID.gif
+    if 'tenor.com/view/' in url:
+        # Extract the numeric ID at the end
+        match = re.search(r'-(\d+)$', url.rstrip('/'))
+        if match:
+            gif_id = match.group(1)
+            # Try the c.tenor.com format which seems more reliable
+            # Note: This may not always work as Tenor uses content hashes too
+            # Best practice is to right-click the GIF and copy the direct image address
+            return f"https://c.tenor.com/{gif_id}.gif"
+    
+    # Handle media.tenor.com URLs (these are already direct)
+    if 'media.tenor.com' in url or 'c.tenor.com' in url:
+        return url
+    
+    # Handle Giphy URLs - convert to direct media link
+    # Format: https://giphy.com/gifs/name-name-ABCDEFG123
+    if 'giphy.com/gifs/' in url:
+        # Extract the alphanumeric ID at the end
+        match = re.search(r'-([A-Za-z0-9]+)$', url.rstrip('/'))
+        if match:
+            gif_id = match.group(1)
+            return f"https://media.giphy.com/media/{gif_id}/giphy.gif"
+    
+    # Handle media.giphy.com URLs (these are already direct)
+    if 'media.giphy.com' in url:
+        return url
+    
+    # If it's already a direct image URL, return as-is
+    if any(url.lower().endswith(ext) for ext in ['.gif', '.png', '.jpg', '.jpeg', '.webp', '.bmp']):
+        return url
+    
+    # For other cases, return original URL and let Discord try to handle it
+    return url
 
 
 class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
@@ -19,7 +74,7 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
 
     yesterday_winners = ui.TextInput(
         label="Yesterday's Winners",
-        placeholder="e.g., Curly, Moe, and Alexander (leave blank if no winners)",
+        placeholder="e.g., Curly, Larry, and Moe (leave blank if no winners)",
         required=False,
         max_length=2000,
         style=discord.TextStyle.paragraph,
@@ -35,7 +90,7 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
 
     image_url = ui.TextInput(
         label="Image URL (optional)",
-        placeholder="https://example.com/image.png",
+        placeholder="Right-click image → Copy Image Address (not page URL)",
         required=False,
         max_length=500,
         style=discord.TextStyle.short,
@@ -131,9 +186,22 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
 
             # Add image if URL provided
             if self.image_url.value and self.image_url.value.strip():
-                embed.set_image(url=self.image_url.value.strip())
+                original_url = self.image_url.value.strip()
+                processed_url = process_image_url(original_url)
+                
+                try:
+                    embed.set_image(url=processed_url)
+                    # If URL was converted, log it
+                    if processed_url != original_url:
+                        print(f"Converted image URL: {original_url} -> {processed_url}")
+                except Exception as e:
+                    # If the image URL is invalid, log it but continue posting the question
+                    print(f"Warning: Could not set image with URL '{processed_url}': {e}")
+                    # Optionally, you could add a note to the embed footer
+                    embed.set_footer(text="Please click the button below to submit your answer! (Note: Image URL may be invalid)")
 
-            embed.set_footer(text="Please mail Swtriviatime in-game OR click the button below to submit your answer!")
+            else:
+                embed.set_footer(text="Please click the button below to submit your answer!")
 
             # Create persistent button view
             view = AnswerButton()
