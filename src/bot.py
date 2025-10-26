@@ -178,10 +178,16 @@ async def on_message(message: discord.Message) -> None:
     
     # Check if message has minimal text content (allow empty or very short messages)
     # This allows "here's the image" type messages but filters out regular conversation
+    # Also allow messages where the text is just the image URL (pasted links)
     text_content = message.content.strip() if message.content else ""
-    if len(text_content) > 50:  # If message has substantial text, don't auto-attach
-        print(f"⚠️  Message has too much text ({len(text_content)} chars), skipping auto-attach")
-        return
+    if len(text_content) > 50:
+        # Allow if the text is just the image URL or a link
+        if text_content != image_url and not text_content.startswith(('http://', 'https://')):
+            print(f"⚠️  Message has too much text ({len(text_content)} chars), skipping auto-attach")
+            return
+        else:
+            print(f"📝 Message has URL text ({len(text_content)} chars), but it's just a link - proceeding")
+
     
     try:
         # Fetch the original question message

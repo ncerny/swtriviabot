@@ -183,6 +183,7 @@ The bot can automatically attach images when you post a question without an imag
    - Works with image attachments and embedded images
 
 **Debug command:**
+
 ```bash
 # Check if there are pending image uploads being tracked
 python check_tracker.py
