@@ -52,6 +52,27 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
             # Defer response
             await interaction.response.defer(ephemeral=True)
 
+            # Check bot permissions in the channel
+            bot_permissions = self.channel.permissions_for(interaction.guild.me)
+            if not bot_permissions.send_messages:
+                await interaction.followup.send(
+                    "❌ I don't have permission to send messages in this channel.\n\n"
+                    "Please give me the following permissions:\n"
+                    "• Send Messages\n"
+                    "• Embed Links\n"
+                    "• Use Application Commands",
+                    ephemeral=True,
+                )
+                return
+
+            if not bot_permissions.embed_links:
+                await interaction.followup.send(
+                    "❌ I don't have permission to embed links in this channel.\n\n"
+                    "Please enable the 'Embed Links' permission for me.",
+                    ephemeral=True,
+                )
+                return
+
             # Get previous answers before resetting
             previous_session = answer_service.get_session(self.guild_id)
             previous_answers_message = None
@@ -265,7 +286,7 @@ async def post_question_command(interaction: discord.Interaction) -> None:
         # Get guild context
         guild_id = str(interaction.guild_id) if interaction.guild_id else "DM"
 
-        # Validate guild context
+        # Validate guild context (quick check, no await)
         if guild_id == "DM":
             await interaction.response.send_message(
                 "❌ This command can only be used in a server, not in DMs",
@@ -273,28 +294,8 @@ async def post_question_command(interaction: discord.Interaction) -> None:
             )
             return
 
-        # Check bot permissions in the channel
-        bot_permissions = interaction.channel.permissions_for(interaction.guild.me)
-        if not bot_permissions.send_messages:
-            await interaction.response.send_message(
-                "❌ I don't have permission to send messages in this channel.\n\n"
-                "Please give me the following permissions:\n"
-                "• Send Messages\n"
-                "• Embed Links\n"
-                "• Use Application Commands",
-                ephemeral=True,
-            )
-            return
-
-        if not bot_permissions.embed_links:
-            await interaction.response.send_message(
-                "❌ I don't have permission to embed links in this channel.\n\n"
-                "Please enable the 'Embed Links' permission for me.",
-                ephemeral=True,
-            )
-            return
-
-        # Open the modal
+        # Open the modal immediately - permission checks happen in modal submission
+        # This prevents interaction timeout when GIFs or attachments are present
         modal = PostQuestionModal(guild_id=guild_id, channel=interaction.channel)
         await interaction.response.send_modal(modal)
 

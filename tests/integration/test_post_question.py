@@ -18,13 +18,6 @@ async def test_post_question_command_success(mock_interaction, tmp_path):
     """Test /post-question command opens modal successfully."""
     storage_service.DATA_DIR = tmp_path
     
-    # Mock channel permissions
-    bot_permissions = Mock()
-    bot_permissions.send_messages = True
-    bot_permissions.embed_links = True
-    mock_interaction.channel.permissions_for = Mock(return_value=bot_permissions)
-    mock_interaction.guild.me = Mock()
-    
     await post_question_command.callback(mock_interaction)
     
     # Verify modal was sent
@@ -47,37 +40,89 @@ async def test_post_question_command_dm_rejected(mock_interaction):
 
 
 @pytest.mark.asyncio
-async def test_post_question_command_no_send_permission(mock_interaction):
-    """Test error when bot lacks send message permission."""
-    bot_permissions = Mock()
-    bot_permissions.send_messages = False
-    bot_permissions.embed_links = True
-    mock_interaction.channel.permissions_for = Mock(return_value=bot_permissions)
-    mock_interaction.guild.me = Mock()
+async def test_post_question_command_sends_modal_immediately(mock_interaction):
+    """Test that modal is sent immediately without checking permissions first.
     
+    This prevents interaction timeout when GIFs or attachments are present.
+    Permission checks are deferred to modal submission.
+    """
     await post_question_command.callback(mock_interaction)
     
-    # Verify permission error message
-    call_args = mock_interaction.response.send_message.call_args
-    assert "don't have permission to send messages" in call_args[0][0]
-    assert call_args[1]["ephemeral"] is True
+    # Verify modal was sent immediately
+    mock_interaction.response.send_modal.assert_called_once()
+    modal = mock_interaction.response.send_modal.call_args[0][0]
+    assert isinstance(modal, PostQuestionModal)
+    
+    # Verify no permission checks happened in command handler
+    assert not mock_interaction.channel.permissions_for.called
 
 
 @pytest.mark.asyncio
-async def test_post_question_command_no_embed_permission(mock_interaction):
-    """Test error when bot lacks embed links permission."""
+async def test_post_question_modal_checks_send_permission(mock_interaction, mock_channel, tmp_path):
+    """Test that modal submission checks for send message permission."""
+    storage_service.DATA_DIR = tmp_path
+    guild_id = str(mock_interaction.guild_id)
+    
+    # Mock insufficient permissions
+    bot_permissions = Mock()
+    bot_permissions.send_messages = False
+    bot_permissions.embed_links = True
+    mock_channel.permissions_for = Mock(return_value=bot_permissions)
+    
+    # Create modal
+    modal = PostQuestionModal(guild_id=guild_id, channel=mock_channel)
+    modal.yesterday_answer = Mock()
+    modal.yesterday_answer.value = ""
+    modal.yesterday_winners = Mock()
+    modal.yesterday_winners.value = ""
+    modal.todays_question = Mock()
+    modal.todays_question.value = "Test question"
+    modal.image_url = Mock()
+    modal.image_url.value = ""
+    
+    await modal.on_submit(mock_interaction)
+    
+    # Verify permission error was sent via followup
+    followup_call = mock_interaction.followup.send.call_args
+    assert "don't have permission to send messages" in followup_call[0][0]
+    assert followup_call[1]["ephemeral"] is True
+    
+    # Verify question was NOT posted
+    mock_channel.send.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_post_question_modal_checks_embed_permission(mock_interaction, mock_channel, tmp_path):
+    """Test that modal submission checks for embed links permission."""
+    storage_service.DATA_DIR = tmp_path
+    guild_id = str(mock_interaction.guild_id)
+    
+    # Mock insufficient permissions
     bot_permissions = Mock()
     bot_permissions.send_messages = True
     bot_permissions.embed_links = False
-    mock_interaction.channel.permissions_for = Mock(return_value=bot_permissions)
-    mock_interaction.guild.me = Mock()
+    mock_channel.permissions_for = Mock(return_value=bot_permissions)
     
-    await post_question_command.callback(mock_interaction)
+    # Create modal
+    modal = PostQuestionModal(guild_id=guild_id, channel=mock_channel)
+    modal.yesterday_answer = Mock()
+    modal.yesterday_answer.value = ""
+    modal.yesterday_winners = Mock()
+    modal.yesterday_winners.value = ""
+    modal.todays_question = Mock()
+    modal.todays_question.value = "Test question"
+    modal.image_url = Mock()
+    modal.image_url.value = ""
     
-    # Verify permission error message
-    call_args = mock_interaction.response.send_message.call_args
-    assert "don't have permission to embed links" in call_args[0][0]
-    assert call_args[1]["ephemeral"] is True
+    await modal.on_submit(mock_interaction)
+    
+    # Verify permission error was sent via followup
+    followup_call = mock_interaction.followup.send.call_args
+    assert "don't have permission to embed links" in followup_call[0][0]
+    assert followup_call[1]["ephemeral"] is True
+    
+    # Verify question was NOT posted
+    mock_channel.send.assert_not_called()
 
 
 @pytest.mark.asyncio
