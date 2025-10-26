@@ -133,7 +133,8 @@ Ensure your repository has the following files:
 1. Create `Dockerfile`:
 
 ```dockerfile
-FROM python:3.14-slim
+# Use Python 3.13 slim image for minimal size
+FROM python:3.13-slim
 
 WORKDIR /app
 

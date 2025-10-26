@@ -17,7 +17,9 @@ A Discord bot for managing trivia game answers with slash commands. Players subm
 
 ### Prerequisites
 
-- Python 3.14 or higher
+## Requirements
+
+- Python 3.13 or higher
 - Discord bot token ([Get one here](https://discord.com/developers/applications))
 - Discord bot invited to your server with:
   - `applications.commands` scope
@@ -161,7 +163,7 @@ Example response:
 
 - Check memory usage: `free -h`
 - Review error logs for Python exceptions
-- Ensure Python 3.14+ is installed: `python3 --version`
+- Ensure Python 3.13+ is installed: `python3 --version`
 
 ---
 

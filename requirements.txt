@@ -1,5 +1,5 @@
 # Discord Trivia Bot Dependencies
-# Python 3.14+ required
+# Python 3.13+ required
 
 # Core Discord Bot
 discord.py>=2.3.0

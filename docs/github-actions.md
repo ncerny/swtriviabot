@@ -13,8 +13,9 @@ This repository uses GitHub Actions for continuous integration and deployment. T
 **Expected Duration**: 2-5 minutes
 
 **What it does:**
-1. Checks out PR code
-2. Sets up Python 3.14 environment
+#### Steps
+1. Checks out code (actions/checkout@v4)
+2. Sets up Python 3.13 environment
 3. Installs dependencies
 4. Runs pytest with coverage enforcement (≥80%)
 5. Uploads coverage reports as artifacts
@@ -23,7 +24,9 @@ This repository uses GitHub Actions for continuous integration and deployment. T
 - **Tests fail**: Fix the failing tests in your PR
 - **Coverage below 80%**: Add tests to increase coverage
 - **Dependency installation fails**: Check `requirements.txt` syntax
-- **Python setup fails**: Verify Python 3.14 is specified correctly
+#### Common Issues
+
+- **Python setup fails**: Verify Python 3.13 is specified correctly
 
 **Artifacts Produced:**
 - `coverage-report` (HTML): Browse-able coverage report (retention: 30 days)
@@ -39,7 +42,7 @@ This repository uses GitHub Actions for continuous integration and deployment. T
 
 **What it does:**
 1. Checks out code with full Git history
-2. Sets up Python 3.14 and Node.js 20
+2. Sets up Python 3.13 and Node.js 20
 3. Runs tests as safety check (≥80% coverage)
 4. Installs semantic-release
 5. Analyzes commits since last release
@@ -158,7 +161,7 @@ All workflows have timeout limits to prevent hanging:
 3. **Review logs**: Click "Details" on failed status check in PR
 4. **Common issues**:
    - Missing test fixtures
-   - Incorrect Python version (must be 3.14+)
+   - Incorrect Python version (must be 3.13+)
    - Import errors (check `requirements.txt`)
 
 ### Release Not Created After Merge
