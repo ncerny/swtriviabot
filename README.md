@@ -169,53 +169,54 @@ Example response:
 
 The bot supports adding images or GIFs to trivia questions. Here's what works:
 
-**✅ Working Image URLs:**
-- Direct image URLs (ending in `.gif`, `.png`, `.jpg`, etc.)
+**✅ Recommended Method - Discord CDN:**
+1. Send your GIF in any Discord channel
+2. Right-click the GIF → "Copy Image Address"
+3. Paste that URL in the bot (format: `cdn.discordapp.com/...`)
+4. ✅ This always works and is the most reliable method!
+
+**✅ Also Works:**
 - Giphy URLs (automatically converted to direct links)
-- Discord CDN URLs (`cdn.discordapp.com`)
+- Direct image URLs (ending in `.gif`, `.png`, `.jpg`, etc.)
 
-**⚠️ Tenor URLs (requires API key):**
-- Tenor URLs (`tenor.com/view/...`) require a Tenor API key
-- Without API key: URLs are used as-is (may not display)
-- With API key: Automatically converted to direct GIF URLs
+**❌ Tenor URLs - Currently Not Supported:**
+- Tenor URLs (`tenor.com/view/...`) require Google Tenor API
+- **Google has made this API very difficult to enable** (known issue)
+- Even with billing enabled, many users get permission errors
+- We recommend using the Discord CDN method instead
 
-**How to enable Tenor support:**
+**If you really want to try enabling Tenor API:**
+
+<details>
+<summary>Click to expand Tenor API troubleshooting (advanced)</summary>
+
+> ⚠️ **Warning**: This is known to fail even for project owners with billing enabled. Use Discord CDN instead.
 
 1. Get a Google Cloud API key from [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
-2. **Enable Tenor API** (this is where most people get stuck):
-   - The Tenor API might not appear in the API Library search
-   - Try these troubleshooting steps:
-   
-   **Option A: Use the error message URL**
+2. Try to enable Tenor API:
    ```bash
-   # Test your API key to get the enablement URL
-   curl "https://tenor.googleapis.com/v2/search?q=test&key=YOUR_API_KEY&limit=1"
+   gcloud services enable tenor.googleapis.com
    ```
-   - The error will include a direct link to enable the API for your project
-   - Visit that URL and click "ENABLE"
+3. If you get "PERMISSION_DENIED" even as project owner:
+   - This is a known Google Cloud issue
+   - The API exists but the enablement mechanism is broken
+   - No known workaround exists currently
    
-   **Option B: Direct enablement URL**
-   - Replace `YOUR_PROJECT_ID` with your Google Cloud project ID:
-   ```
-   https://console.developers.google.com/apis/api/tenor.googleapis.com?project=YOUR_PROJECT_ID
-   ```
-   
-   **Option C: Use an unrestricted API key**
-   - In Google Cloud Console → APIs & Services → Credentials
-   - Create a new API key
-   - Don't restrict it (or only restrict by IP/HTTP referrer, not by API)
-   - This is less secure but works if the Tenor API won't enable
-
-3. Add to your `.env` file:
+4. If it works (rare), add to `.env`:
    ```
    TENOR_API_KEY=your_api_key_here
    ```
 
-4. Restart the bot
+**Why this happens:**
+- Tenor API exists (`tenor.googleapis.com`) but doesn't appear in API Library
+- Direct enablement URLs result in "Failed to load" errors
+- REST API enablement returns error code 110002 (billing/quota issue)
+- Even unrestricted API keys fail with SERVICE_DISABLED
+- Google's documentation mentions the API but it's not publicly accessible
 
-**Workaround if Tenor API won't enable:**
-- Users can upload GIFs directly to Discord, then right-click → "Copy Image Address"
-- Use the Discord CDN URL (these always work)
+</details>
+
+**TL;DR**: Just use Discord CDN - it's easier and more reliable!
 
 ---
 

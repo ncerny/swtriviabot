@@ -90,7 +90,7 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
 
     image_url = ui.TextInput(
         label="Image URL (optional)",
-        placeholder="Paste Tenor/Giphy URL or direct image link. Leave blank if none.",
+        placeholder="Giphy URL or upload to Discord & copy image address",
         required=False,
         max_length=500,
         style=discord.TextStyle.short,
