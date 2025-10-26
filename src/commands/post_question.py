@@ -10,7 +10,7 @@ from src.services.image_tracker import get_image_tracker
 async def process_image_url(url: str) -> str:
     """Process image URL to ensure it's a direct link to the image.
     
-    Handles special cases like Tenor video URLs that need to be converted to GIF format.
+    Handles special cases like Tenor video URLs.
     
     Args:
         url: The image URL provided by the user
@@ -23,11 +23,9 @@ async def process_image_url(url: str) -> str:
     
     url = url.strip()
     
-    # Convert Tenor .mp4 URLs to .gif format for Discord embed compatibility
-    # Tenor URLs like https://media.tenor.com/xxx.mp4 can be changed to .gif
-    if 'tenor.com' in url and url.endswith('.mp4'):
-        url = url[:-4] + '.gif'
-        print(f"🔄 Converted Tenor .mp4 to .gif: {url[:100]}...")
+    # Don't convert Tenor URLs - Discord handles .mp4 from Tenor directly
+    # The conversion to .gif doesn't seem to work properly
+    print(f"� Using URL as-is: {url[:100]}...")
     
     return url
 

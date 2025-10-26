@@ -234,13 +234,15 @@ async def on_message(message: discord.Message) -> None:
             
             # Create a new embed with all the same properties plus the image
             # This works better than modifying existing embed that had no image
+            # For animated GIFs from Tenor, set the URL field to enable video playback
             new_embed = discord.Embed(
                 description=old_embed.description,
                 color=old_embed.color,
                 title=old_embed.title,
-                url=old_embed.url
+                url=processed_url if processed_url.endswith('.gif') else old_embed.url
             )
             new_embed.set_image(url=processed_url)
+            print(f"🎬 Created embed with image URL: {processed_url[:100]}...")
             
             # Copy footer if it exists
             if old_embed.footer:
