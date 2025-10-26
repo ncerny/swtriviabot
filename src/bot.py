@@ -215,7 +215,8 @@ async def on_message(message: discord.Message) -> None:
                 await message.delete()
                 print(f"✅ Auto-attached image to question {pending.message_id} and deleted follow-up message")
             except discord.Forbidden:
-                print(f"⚠️  Could not delete follow-up message (missing permissions)")
+                print(f"⚠️  Could not delete follow-up message (missing 'Manage Messages' permission)")
+                print(f"💡 Image was attached successfully! Grant 'Manage Messages' permission to auto-delete follow-up posts.")
             except Exception as e:
                 print(f"⚠️  Could not delete follow-up message: {e}")
             

@@ -10,6 +10,7 @@ A Discord bot for managing trivia game answers with slash commands. Players subm
 
 - **View Submissions**: Admins list all answers with `/list-answers` command
 - **Reset Sessions**: Admins clear all answers with `/reset-answers` command
+- **Auto-Attach Images**: Post a question without an image, then post an image within 3 minutes - the bot automatically attaches it and cleans up your follow-up message
 - **Multi-Server Support**: Isolated session state per Discord server
 - **Persistent Storage**: Session data saved to disk for durability
 
@@ -23,7 +24,10 @@ A Discord bot for managing trivia game answers with slash commands. Players subm
 - Discord bot token ([Get one here](https://discord.com/developers/applications))
 - Discord bot invited to your server with:
   - `applications.commands` scope
-  - `bot` scope with `Send Messages` permission
+  - `bot` scope with permissions:
+    - `Send Messages` - Post questions and responses
+    - `Embed Links` - Display question embeds
+    - `Manage Messages` - (Optional) Delete follow-up image messages in auto-attach feature
 
 ### Installation
 
