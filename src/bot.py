@@ -148,23 +148,36 @@ async def on_message(message: discord.Message) -> None:
         return
     
     # Check if message has attachments or embeds with images
+    # Priority: attachments > message content URL > embed URLs
     image_url = None
     
-    # Check attachments first
+    # 1. Check attachments first (preserves animation for uploaded files)
     if message.attachments:
         for attachment in message.attachments:
             if attachment.content_type and attachment.content_type.startswith('image/'):
                 image_url = attachment.url
+                print(f"🖼️  Found image attachment: {attachment.filename} (animated: {attachment.content_type})")
                 break
     
-    # Check embeds if no attachment found
+    # 2. If no attachment, check if message content is a direct image URL
+    #    This preserves the original URL instead of Discord's embed preview
+    if not image_url and message.content:
+        text = message.content.strip()
+        # Check if the text is a URL pointing to an image file
+        if text.startswith(('http://', 'https://')) and any(text.lower().endswith(ext) for ext in ['.gif', '.png', '.jpg', '.jpeg', '.webp', '.bmp']):
+            image_url = text
+            print(f"🖼️  Found image URL in message text: {image_url[:100]}...")
+    
+    # 3. Check embeds as last resort (might lose animation)
     if not image_url and message.embeds:
         for embed in message.embeds:
             if embed.image:
                 image_url = embed.image.url
+                print(f"⚠️  Using embed image (may lose animation): {image_url[:100]}...")
                 break
             elif embed.thumbnail:
                 image_url = embed.thumbnail.url
+                print(f"⚠️  Using embed thumbnail (may lose animation): {image_url[:100]}...")
                 break
     
     # If no image found, ignore this message
@@ -172,7 +185,8 @@ async def on_message(message: discord.Message) -> None:
         print(f"⚠️  No image found in message from user {message.author.id}")
         return
     
-    print(f"🖼️  Found image in message: {image_url[:100]}...")
+    # Note: We removed the "Found image in message" log since we now log at each detection point
+
     
     # Check if message has minimal text content (allow empty or very short messages)
     # This allows "here's the image" type messages but filters out regular conversation

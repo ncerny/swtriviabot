@@ -200,12 +200,14 @@ The bot supports adding images or GIFs to trivia questions. Here's what works:
 **✅ Recommended Methods:**
 
 1. **Upload directly to Discord** (automatic):
+
    - Post question without image URL
    - Within 3 minutes, post an image in the same channel
    - Bot automatically attaches it and cleans up your follow-up message
    - Works with file uploads or image URLs
 
 2. **Discord CDN** (manual):
+
    - Send your GIF in any Discord channel
    - Right-click the GIF → "Copy Image Address"
    - Paste that URL in the image field (format: `cdn.discordapp.com/...`)
