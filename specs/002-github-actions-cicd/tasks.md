@@ -165,7 +165,7 @@
 - [x] T035 [P] Document commit message format (conventional commits) in CONTRIBUTING.md or README.md
 - [x] T036 [P] Update .github/copilot-instructions.md with recent changes marker
 - [x] T037 Create pull request template in .github/pull_request_template.md with commit format reminder
-- [ ] T038 Test end-to-end flow per quickstart.md validation scenario
+- [x] T038 Test end-to-end flow per quickstart.md validation scenario
 - [x] T039 [P] Verify workflow execution times meet performance budgets (<5min tests, <2min release, <1min artifact)
 - [x] T040 [P] Add workflow failure notification documentation in README.md or docs/
 - [x] T041 Document deployment process using artifact in DEPLOYMENT.md
