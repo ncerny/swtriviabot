@@ -11,7 +11,7 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
 
     yesterday_answer = ui.TextInput(
         label="Yesterday's Answer",
-        placeholder="e.g., Coffee Ice Cream",
+        placeholder="e.g., Paris",
         required=False,
         max_length=2000,
         style=discord.TextStyle.paragraph,
@@ -19,7 +19,7 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
 
     yesterday_winners = ui.TextInput(
         label="Yesterday's Winners",
-        placeholder="e.g., Congrats to Teralar, your gold has been mailed. Thanks for playing!",
+        placeholder="e.g., Curly, Moe, and Alexander (leave blank if no winners)",
         required=False,
         max_length=2000,
         style=discord.TextStyle.paragraph,
