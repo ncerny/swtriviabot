@@ -165,6 +165,29 @@ Example response:
 - Review error logs for Python exceptions
 - Ensure Python 3.13+ is installed: `python3 --version`
 
+### Automatic image attachment not working
+
+The bot can automatically attach images when you post a question without an image, then post an image separately within 3 minutes. If this isn't working:
+
+1. **Restart the bot** - The feature requires the latest code to be running
+2. **Check bot logs** - Look for messages like:
+   - `📸 Tracking question <id> for image upload from user <id>` (when question is posted)
+   - `🖼️  Found image in message` (when image is detected)
+   - `✅ Auto-attached image to question` (when successful)
+3. **Verify timing** - Image must be posted within 3 minutes of the question
+4. **Check channel** - Image must be posted in the same channel as the question
+5. **Check permissions** - Bot needs permission to edit messages and delete messages
+6. **Image requirements**:
+   - Must be an actual image attachment (not a link in text)
+   - Message should have minimal text (≤50 characters)
+   - Works with image attachments and embedded images
+
+**Debug command:**
+```bash
+# Check if there are pending image uploads being tracked
+python check_tracker.py
+```
+
 ### Images/GIFs not displaying in questions
 
 The bot supports adding images or GIFs to trivia questions. Here's what works:
@@ -181,6 +204,7 @@ The bot supports adding images or GIFs to trivia questions. Here's what works:
 The bot includes a built-in GIF search feature with two providers:
 
 1. **Giphy** - Popular GIF library (✅ Recommended - Works Well)
+
    - Get free API key at: https://developers.giphy.com/
    - Add to `.env`: `GIPHY_API_KEY=your_key_here`
    - Free tier: 42 requests/hour
@@ -200,6 +224,7 @@ The bot includes a built-in GIF search feature with two providers:
    - If Klipy doesn't work for you, use Giphy instead
 
 **How to use:**
+
 1. Type `/search-gif` in Discord
 2. Choose provider (Giphy or Klipy)
 3. Enter search term (e.g., "excited", "star wars")
