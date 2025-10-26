@@ -124,27 +124,28 @@ async def on_message(message: discord.Message) -> None:
     if not message.guild:
         return
     
+    print(f"🔍 Processing message from {message.author.name} (ID: {message.author.id})")
+    
     # Check if this user has a pending image upload
     image_tracker = get_image_tracker()
     pending = image_tracker.get_pending(message.guild.id, message.author.id)
     
     if not pending:
-        # Debug: Log when we check for pending but find none
-        logger.debug(f"No pending image upload for user {message.author.id} in guild {message.guild.id}")
+        # Debug: Log when we check for pending but find none (only for specific checks)
+        # Uncomment to debug: print(f"No pending image upload for user {message.author.id}")
         return
     
     # Check if the pending upload has expired
     if pending.is_expired():
         image_tracker.remove_pending(message.guild.id, message.author.id)
-        logger.info(f"⏰ Expired pending image upload for user {message.author.id}")
         print(f"⏰ Expired pending image upload for user {message.author.id}")
         return
     
-    logger.info(f"📸 Found pending image upload for user {message.author.id}, checking message...")
+    print(f"📸 Found pending image upload for user {message.author.id}, checking message...")
     
     # Check if message is in the same channel as the question
     if message.channel.id != pending.channel_id:
-        logger.debug(f"Message in different channel ({message.channel.id} vs {pending.channel_id})")
+        print(f"⚠️  Message in different channel ({message.channel.id} vs {pending.channel_id})")
         return
     
     # Check if message has attachments or embeds with images
@@ -169,16 +170,16 @@ async def on_message(message: discord.Message) -> None:
     
     # If no image found, ignore this message
     if not image_url:
-        logger.debug(f"No image found in message from user {message.author.id}")
+        print(f"⚠️  No image found in message from user {message.author.id}")
         return
     
-    logger.info(f"🖼️  Found image in message: {image_url[:100]}...")
+    print(f"🖼️  Found image in message: {image_url[:100]}...")
     
     # Check if message has minimal text content (allow empty or very short messages)
     # This allows "here's the image" type messages but filters out regular conversation
     text_content = message.content.strip() if message.content else ""
     if len(text_content) > 50:  # If message has substantial text, don't auto-attach
-        logger.info(f"Message has too much text ({len(text_content)} chars), skipping auto-attach")
+        print(f"⚠️  Message has too much text ({len(text_content)} chars), skipping auto-attach")
         return
     
     try:
