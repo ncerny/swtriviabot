@@ -48,6 +48,24 @@ jobs:
         run: npm ci
 
       - name: Run semantic-release
+        id: semantic
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npx semantic-release
+        run: |
+          npx semantic-release | tee semantic-release.log
+          
+          # Extract version from semantic-release output
+          if grep -q "Published release" semantic-release.log; then
+            NEW_VERSION=$(grep "Published release" semantic-release.log | sed -n 's/.*Published release \(.*\) on.*/\1/p')
+            echo "new_release_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+            echo "new_release_published=true" >> $GITHUB_OUTPUT
+          else
+            echo "new_release_published=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Trigger artifact workflow
+        if: steps.semantic.outputs.new_release_published == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh workflow run artifact.yml -f tag=v${{ steps.semantic.outputs.new_release_version }}

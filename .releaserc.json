@@ -61,7 +61,10 @@
     [
       "@semantic-release/github",
       {
-        "assets": []
+        "assets": [],
+        "successComment": false,
+        "failTitle": false,
+        "releasedLabels": false
       }
     ]
   ]
