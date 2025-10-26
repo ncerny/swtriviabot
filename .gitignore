@@ -6,6 +6,10 @@
 data/
 *.json
 
+# Allow npm package files
+!package.json
+!package-lock.json
+
 # Python
 __pycache__/
 *.py[cod]
