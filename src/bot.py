@@ -128,11 +128,12 @@ async def on_message(message: discord.Message) -> None:
     
     # Check if this user has a pending image upload
     image_tracker = get_image_tracker()
+    print(f"🔍 Checking for pending upload: guild={message.guild.id}, user={message.author.id}")
+    print(f"🔍 Total pending uploads in tracker: {image_tracker.count_pending()}")
     pending = image_tracker.get_pending(message.guild.id, message.author.id)
     
     if not pending:
-        # Debug: Log when we check for pending but find none (only for specific checks)
-        # Uncomment to debug: print(f"No pending image upload for user {message.author.id}")
+        print(f"❌ No pending image upload found for user {message.author.id} in guild {message.guild.id}")
         return
     
     # Check if the pending upload has expired
