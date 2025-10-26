@@ -23,23 +23,6 @@ def process_image_url(url: str) -> str:
         
     url = url.strip()
     
-    # Handle Tenor URLs - try to convert to GIF format
-    # Format: https://tenor.com/view/name-name-name-gif-12345678
-    # Tenor's actual GIF URLs are: https://media.tenor.com/HASH.gif or https://c.tenor.com/ID.gif
-    if 'tenor.com/view/' in url:
-        # Extract the numeric ID at the end
-        match = re.search(r'-(\d+)$', url.rstrip('/'))
-        if match:
-            gif_id = match.group(1)
-            # Try the c.tenor.com format which seems more reliable
-            # Note: This may not always work as Tenor uses content hashes too
-            # Best practice is to right-click the GIF and copy the direct image address
-            return f"https://c.tenor.com/{gif_id}.gif"
-    
-    # Handle media.tenor.com URLs (these are already direct)
-    if 'media.tenor.com' in url or 'c.tenor.com' in url:
-        return url
-    
     # Handle Giphy URLs - convert to direct media link
     # Format: https://giphy.com/gifs/name-name-ABCDEFG123
     if 'giphy.com/gifs/' in url:
@@ -51,6 +34,12 @@ def process_image_url(url: str) -> str:
     
     # Handle media.giphy.com URLs (these are already direct)
     if 'media.giphy.com' in url:
+        return url
+    
+    # Handle Tenor URLs - Discord can actually handle these directly in many cases
+    # Just return as-is and let Discord's embed system handle it
+    # Users can also right-click -> "Copy Image Address" for direct URLs
+    if 'tenor.com' in url:
         return url
     
     # If it's already a direct image URL, return as-is
@@ -90,7 +79,7 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
 
     image_url = ui.TextInput(
         label="Image URL (optional)",
-        placeholder="Right-click image → Copy Image Address (not page URL)",
+        placeholder="Must be direct image URL ending in .gif, .png, etc.",
         required=False,
         max_length=500,
         style=discord.TextStyle.short,
@@ -197,11 +186,9 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
                 except Exception as e:
                     # If the image URL is invalid, log it but continue posting the question
                     print(f"Warning: Could not set image with URL '{processed_url}': {e}")
-                    # Optionally, you could add a note to the embed footer
-                    embed.set_footer(text="Please click the button below to submit your answer! (Note: Image URL may be invalid)")
 
-            else:
-                embed.set_footer(text="Please click the button below to submit your answer!")
+            # Always set footer
+            embed.set_footer(text="Please click the button below to submit your answer!")
 
             # Create persistent button view
             view = AnswerButton()
