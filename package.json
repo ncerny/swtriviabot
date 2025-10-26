@@ -1,0 +1,16 @@
+{
+  "name": "swtriviabot-release",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Release automation for SWTriviaBot",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ncerny/swtriviabot.git"
+  },
+  "devDependencies": {
+    "semantic-release": "^22.0.0",
+    "@semantic-release/commit-analyzer": "^11.0.0",
+    "@semantic-release/release-notes-generator": "^12.0.0",
+    "@semantic-release/github": "^9.0.0"
+  }
+}
