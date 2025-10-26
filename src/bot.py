@@ -248,9 +248,19 @@ async def on_message(message: discord.Message) -> None:
             
             print(f"📋 New embed created with image: {new_embed.image.url[:100]}...")
             
-            # Edit the message with the new embed
+            # Fetch the message again to get the view
+            question_message = await channel.fetch_message(pending.message_id)
+            
+            # Edit the message with the new embed, preserving content and view
             await question_message.edit(embed=new_embed)
             print(f"✏️  Edited question message with new embed")
+            
+            # Verify the edit worked by fetching again
+            updated_message = await channel.fetch_message(pending.message_id)
+            if updated_message.embeds and updated_message.embeds[0].image:
+                print(f"✅ Verified: Message now has image: {updated_message.embeds[0].image.url[:100]}...")
+            else:
+                print(f"❌ ERROR: Message still has no image after edit!")
             
             # Delete the follow-up image message
             try:
