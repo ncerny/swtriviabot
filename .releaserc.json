@@ -59,9 +59,20 @@
       }
     ],
     [
+      "@semantic-release/exec",
+      {
+        "prepareCmd": "tar --exclude-from=.github/.artifactignore --exclude='swtriviabot-*.tar.gz' -czf swtriviabot-v${nextRelease.version}.tar.gz ."
+      }
+    ],
+    [
       "@semantic-release/github",
       {
-        "assets": [],
+        "assets": [
+          {
+            "path": "swtriviabot-*.tar.gz",
+            "label": "Production Deployment Artifact"
+          }
+        ],
         "successComment": false,
         "failTitle": false,
         "releasedLabels": false
