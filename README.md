@@ -1,5 +1,9 @@
 # Discord Trivia Bot
 
+[![PR Tests](https://github.com/ncerny/swtriviabot/actions/workflows/pr-tests.yml/badge.svg)](https://github.com/ncerny/swtriviabot/actions/workflows/pr-tests.yml)
+[![Release](https://github.com/ncerny/swtriviabot/actions/workflows/release.yml/badge.svg)](https://github.com/ncerny/swtriviabot/actions/workflows/release.yml)
+[![Build Artifact](https://github.com/ncerny/swtriviabot/actions/workflows/artifact.yml/badge.svg)](https://github.com/ncerny/swtriviabot/actions/workflows/artifact.yml)
+
 A Discord bot for managing trivia game answers with slash commands. Players submit answers, admins view and reset sessions.
 
 ## Features
@@ -244,6 +248,58 @@ Contributions are welcome! Please follow these guidelines:
 3. Write tests first (Red-Green-Refactor)
 4. Implement your changes
 5. Run tests and linting: `pytest && flake8 src/`
+6. **Use conventional commits**: `feat:`, `fix:`, `docs:`, `test:`, `chore:`, etc.
+   - `feat: add new command` → Minor version bump
+   - `fix: correct answer validation` → Patch version bump
+   - `feat!: change API` or `BREAKING CHANGE:` → Major version bump
+7. Push changes and create a pull request
+   - All PRs are automatically tested (see badge above)
+   - Tests must pass with ≥80% coverage
+8. Wait for review and address feedback
+
+### Commit Message Format
+
+We use [Conventional Commits](https://www.conventionalcommits.org/) for automatic semantic versioning:
+
+```
+<type>(<scope>): <subject>
+
+<body>
+
+<footer>
+```
+
+**Types:**
+- `feat`: New feature (minor version bump)
+- `fix`: Bug fix (patch version bump)
+- `docs`: Documentation only
+- `test`: Adding or updating tests
+- `refactor`: Code change that neither fixes a bug nor adds a feature
+- `perf`: Performance improvement (patch version bump)
+- `chore`: Maintenance tasks
+
+**Breaking Changes:**
+- Add `!` after type: `feat!: redesign command interface`
+- Or include `BREAKING CHANGE:` in footer (major version bump)
+
+**Examples:**
+```bash
+git commit -m "feat: add /leaderboard command"
+git commit -m "fix: prevent duplicate submissions in same second"
+git commit -m "docs: update deployment instructions"
+git commit -m "feat!: change answer storage format
+
+BREAKING CHANGE: Answer format changed from string to object"
+```
+
+### Release Process
+
+Releases are automated via GitHub Actions:
+1. PRs are tested automatically (PR Tests workflow)
+2. Merging to `main` triggers semantic-release (Release workflow)
+3. Version is calculated from conventional commits
+4. Release notes are auto-generated
+5. Production artifact is attached to release (Artifact workflow)
 6. Format code: `black src/ tests/`
 7. Commit with conventional commit message: `feat: add new feature`
 8. Push and create pull request
@@ -353,6 +409,38 @@ All contributions must comply with these principles.
 - [ ] Answer reveal command
 
 See [specs/](specs/) directory for detailed feature specifications.
+
+---
+
+## Repository Configuration
+
+### Recommended Branch Protection (main branch)
+
+To ensure code quality and automated releases work correctly, configure the following branch protection rules:
+
+1. **Go to**: Repository Settings → Branches → Branch protection rules → Add rule
+2. **Branch name pattern**: `main`
+3. **Enable**:
+   - ✅ Require a pull request before merging
+     - Require approvals: 1 (or more for larger teams)
+   - ✅ Require status checks to pass before merging
+     - Require branches to be up to date before merging
+     - **Required status checks**: `Run Tests` (from PR Tests workflow)
+   - ✅ Require conversation resolution before merging
+   - ✅ Do not allow bypassing the above settings (for admins)
+4. **Save changes**
+
+**Why this matters:**
+- Prevents untested code from reaching main
+- Ensures all PRs have passing tests before merge
+- Triggers automatic releases only for tested code
+- Enforces conventional commit messages through PR review
+
+**Workflow Monitoring:**
+- PR Tests workflow must pass (≥80% coverage)
+- Release workflow runs automatically on merge to main
+- Artifact workflow attaches deployment-ready files to release
+- Check Actions tab for workflow execution status
 
 ---
 

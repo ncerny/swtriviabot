@@ -22,6 +22,8 @@
 - Follow PEP 8 style guidelines for all Python code.
 
 ## Active Technologies
+- Python 3.14+ (existing project standard) + GitHub Actions (workflow automation), pytest 8.4.2+ with pytest-cov 7.0.0+ (testing), conventional commit parser (semantic versioning) (002-github-actions-cicd)
+- GitHub Actions artifacts (build logs, test results), GitHub Releases (release metadata and deployment artifacts) (002-github-actions-cicd)
 
 - Python 3.14+ + discord.py 2.3+, python-dotenv, pytest 7.4+, pytest-asyncio 0.21+ (001-discord-trivia-bot)
 - In-memory only (no database) - using native dict data structures keyed by guild_id (001-discord-trivia-bot)
@@ -29,4 +31,5 @@
 
 ## Recent Changes
 
+- 002-github-actions-cicd: Added GitHub Actions CI/CD workflows (pr-tests.yml, release.yml, artifact.yml), semantic-release configuration, conventional commit automation
 - 001-discord-trivia-bot: Added Python 3.14+ + discord.py 2.3+, python-dotenv, pytest 7.4+, pytest-asyncio 0.21+

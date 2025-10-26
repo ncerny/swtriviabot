@@ -1,0 +1,60 @@
+# .artifactignore
+#
+# Defines exclusion patterns for production artifact generation.
+# Referenced by .github/workflows/artifact.yml
+#
+# This file documents patterns used with tar --exclude flags.
+# Excludes test code, development tools, and documentation not needed at runtime.
+
+# Testing
+tests/
+.pytest_cache/
+htmlcov/
+.coverage
+.coveragerc
+pytest.ini
+
+# Development environment
+.venv/
+venv/
+node_modules/
+package.json
+package-lock.json
+.releaserc.json
+
+# Version control
+.git/
+.github/
+.gitignore
+.gitattributes
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Documentation and specifications
+README.md
+CONTRIBUTING.md
+LICENSE
+docs/
+specs/
+.specify/
+
+# CI/CD configuration (not needed at runtime)
+.github/workflows/
+
+# Python development
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.mypy_cache/
+.ruff_cache/
+
+# Build artifacts
+dist/
+build/
+*.egg-info/

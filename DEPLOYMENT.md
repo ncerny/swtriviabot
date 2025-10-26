@@ -1,18 +1,79 @@
 # Deployment Guide: Discord Trivia Bot
 
-This guide covers deploying the Discord Trivia Bot to pella.app and other hosting platforms.
+This guide covers deploying the Discord Trivia Bot using production artifacts from GitHub Releases or from source code.
 
 ## Prerequisites
 
 - Discord bot token (see [README.md](README.md) for setup instructions)
-- Git repository with your code
 - Hosting platform account (pella.app recommended)
+- (Optional) Git repository access for source deployment
+
+---
+
+## Quick Deploy: Using Release Artifacts (Recommended)
+
+GitHub Actions automatically creates production-ready artifacts for each release. These are smaller, faster to deploy, and contain only the code needed to run the bot.
+
+### 1. Download the Latest Release
+
+1. Go to [GitHub Releases](https://github.com/ncerny/swtriviabot/releases)
+2. Download the `.tar.gz` artifact from the latest release
+3. Extract on your server:
+
+```bash
+# Download (replace VERSION with actual version, e.g., v1.2.3)
+curl -LO https://github.com/ncerny/swtriviabot/releases/download/VERSION/swtriviabot-VERSION.tar.gz
+
+# Extract
+tar -xzf swtriviabot-VERSION.tar.gz
+cd swtriviabot-VERSION
+```
+
+### 2. Install Dependencies
+
+```bash
+# Create virtual environment
+python3 -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+### 3. Configure Bot Token
+
+```bash
+# Copy environment template
+cp .env.example .env
+
+# Edit .env and add your token
+# DISCORD_BOT_TOKEN=your_token_here
+```
+
+### 4. Run the Bot
+
+```bash
+python -m src.bot
+```
+
+**Advantages of Artifact Deployment:**
+- ✅ 30-50% smaller download (no tests, docs, or dev tools)
+- ✅ Faster deployment (fewer files to transfer)
+- ✅ Production-ready (only runtime code included)
+- ✅ Verified by CI/CD (all tests passed before release)
 
 ---
 
 ## Deploying to pella.app
 
-### 1. Prepare Your Repository
+### Option A: From Release Artifact (Recommended)
+
+1. Download artifact to your local machine (see above)
+2. Create pella.app application from local directory
+3. Upload extracted artifact contents
+4. Configure environment and volumes (see below)
+
+### Option B: From Git Repository
 
 Ensure your repository has the following files:
 
@@ -21,48 +82,29 @@ Ensure your repository has the following files:
 - `.env.example` - Template for environment variables
 - `src/bot.py` - Main bot entry point
 
-### 2. Create a pella.app Application
+### pella.app Configuration
 
-1. Go to [pella.app](https://pella.app) and sign up/log in
-2. Click "New Application"
-3. Connect your Git repository
-4. Select the branch (e.g., `001-discord-trivia-bot`)
+1. **Create Application**
+   - Go to [pella.app](https://pella.app) and sign up/log in
+   - Click "New Application"
+   - Connect your Git repository OR upload artifact
 
-### 3. Configure Environment Variables
+2. **Environment Variables**
+   - Go to "Settings" → "Environment Variables"
+   - Add `DISCORD_BOT_TOKEN` with your bot token value
+   - Save changes
 
-In the pella.app dashboard:
+3. **Persistent Storage**
+   - Go to "Settings" → "Volumes"
+   - Add volume: `/app/data` (100MB)
+   - Save changes
 
-1. Go to "Settings" → "Environment Variables"
-2. Add `DISCORD_BOT_TOKEN` with your bot token value
-3. Save changes
-
-### 4. Configure Persistent Storage
-
-The bot requires persistent disk storage for session data:
-
-1. Go to "Settings" → "Volumes"
-2. Add a new volume:
-   - **Mount Path**: `/app/data`
-   - **Size**: 100MB (sufficient for session storage)
-3. Save changes
-
-### 5. Deploy
-
-1. Click "Deploy" in the pella.app dashboard
-2. Monitor deployment logs for any errors
-3. Once deployed, check logs to confirm:
-   - ✅ Bot logged in successfully
-   - 📂 Sessions loaded from disk
-   - 🔄 Commands synced with Discord
-
-### 6. Verify Bot is Running
-
-1. Go to your Discord server
-2. Type `/` and verify the following commands appear:
-   - `/answer` - Submit answer
-   - `/list-answers` - View answers (admin only)
-   - `/reset-answers` - Reset session (admin only)
-3. Test the commands to ensure they work
+4. **Deploy**
+   - Click "Deploy"
+   - Monitor logs for confirmation:
+     - ✅ Bot logged in successfully
+     - 📂 Sessions loaded from disk
+     - 🔄 Commands synced with Discord
 
 ---
 
