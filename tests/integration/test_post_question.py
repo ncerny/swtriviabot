@@ -352,3 +352,91 @@ async def test_answer_button_persistent_view():
     for item in button.children:
         if isinstance(item, discord.ui.Button):
             assert item.custom_id == "trivia:submit_answer"
+
+
+@pytest.mark.asyncio
+async def test_process_image_url_giphy():
+    """Test that Giphy URLs are converted to direct media links."""
+    from src.commands.post_question import process_image_url
+    
+    url = "https://giphy.com/gifs/funny-cat-ABC123xyz"
+    result = await process_image_url(url)
+    assert result == "https://media.giphy.com/media/ABC123xyz/giphy.gif"
+
+
+@pytest.mark.asyncio
+async def test_process_image_url_tenor_with_api(mock_interaction, tmp_path):
+    """Test that Tenor URLs are converted when API is configured."""
+    from src.commands.post_question import process_image_url
+    
+    # Mock the Tenor service
+    with patch("src.commands.post_question.get_tenor_service") as mock_get_service:
+        mock_service = Mock()
+        mock_service.is_configured.return_value = True
+        mock_service.get_gif_url_from_view_url = AsyncMock(
+            return_value="https://media.tenor.com/direct.gif"
+        )
+        mock_get_service.return_value = mock_service
+        
+        url = "https://tenor.com/view/test-gif-12345678"
+        result = await process_image_url(url)
+        
+        assert result == "https://media.tenor.com/direct.gif"
+        mock_service.get_gif_url_from_view_url.assert_called_once_with(url)
+
+
+@pytest.mark.asyncio
+async def test_process_image_url_tenor_without_api():
+    """Test that Tenor URLs are returned as-is when API not configured."""
+    from src.commands.post_question import process_image_url
+    
+    with patch("src.commands.post_question.get_tenor_service") as mock_get_service:
+        mock_service = Mock()
+        mock_service.is_configured.return_value = False
+        mock_get_service.return_value = mock_service
+        
+        url = "https://tenor.com/view/test-gif-12345678"
+        result = await process_image_url(url)
+        
+        assert result == url
+
+
+@pytest.mark.asyncio
+async def test_process_image_url_tenor_api_failure():
+    """Test fallback when Tenor API call fails."""
+    from src.commands.post_question import process_image_url
+    
+    with patch("src.commands.post_question.get_tenor_service") as mock_get_service:
+        mock_service = Mock()
+        mock_service.is_configured.return_value = True
+        mock_service.get_gif_url_from_view_url = AsyncMock(return_value=None)
+        mock_get_service.return_value = mock_service
+        
+        url = "https://tenor.com/view/test-gif-12345678"
+        result = await process_image_url(url)
+        
+        # Should fall back to original URL
+        assert result == url
+
+
+@pytest.mark.asyncio
+async def test_process_image_url_direct_link():
+    """Test that direct image URLs are returned as-is."""
+    from src.commands.post_question import process_image_url
+    
+    url = "https://cdn.example.com/image.gif"
+    result = await process_image_url(url)
+    assert result == url
+
+
+@pytest.mark.asyncio
+async def test_process_image_url_empty():
+    """Test that empty URLs are returned as-is."""
+    from src.commands.post_question import process_image_url
+    
+    result = await process_image_url("")
+    assert result == ""
+    
+    result = await process_image_url(None)
+    assert result is None
+

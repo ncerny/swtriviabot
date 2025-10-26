@@ -4,6 +4,9 @@
 # Core Discord Bot
 discord.py>=2.3.0
 
+# External APIs
+aiohttp>=3.8.0  # For async HTTP requests (already included with discord.py)
+
 # Configuration Management
 python-dotenv>=1.0.0
 

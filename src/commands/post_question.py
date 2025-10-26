@@ -5,9 +5,10 @@ import discord
 from discord import app_commands, ui
 
 from src.services import answer_service, storage_service
+from src.services.tenor_service import get_tenor_service
 
 
-def process_image_url(url: str) -> str:
+async def process_image_url(url: str) -> str:
     """Process image URL to ensure it's a direct link to the image.
     
     Handles special cases like Tenor and Giphy URLs.
@@ -36,10 +37,17 @@ def process_image_url(url: str) -> str:
     if 'media.giphy.com' in url:
         return url
     
-    # Handle Tenor URLs - Discord can actually handle these directly in many cases
-    # Just return as-is and let Discord's embed system handle it
-    # Users can also right-click -> "Copy Image Address" for direct URLs
+    # Handle Tenor URLs - try to convert to direct GIF URL using API
     if 'tenor.com' in url:
+        tenor_service = get_tenor_service()
+        if tenor_service.is_configured():
+            direct_url = await tenor_service.get_gif_url_from_view_url(url)
+            if direct_url:
+                return direct_url
+            # If API call failed, fall back to original URL
+            print(f"Falling back to original Tenor URL: {url}")
+        else:
+            print("Tenor API not configured, using original URL")
         return url
     
     # If it's already a direct image URL, return as-is
@@ -79,7 +87,7 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
 
     image_url = ui.TextInput(
         label="Image URL (optional)",
-        placeholder="Upload GIF to Discord, then Copy Image Address. Leave blank if none.",
+        placeholder="Paste Tenor/Giphy URL or direct image link. Leave blank if none.",
         required=False,
         max_length=500,
         style=discord.TextStyle.short,
@@ -176,7 +184,7 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
             # Add image if URL provided
             if self.image_url.value and self.image_url.value.strip():
                 original_url = self.image_url.value.strip()
-                processed_url = process_image_url(original_url)
+                processed_url = await process_image_url(original_url)
                 
                 try:
                     embed.set_image(url=processed_url)
