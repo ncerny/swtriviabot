@@ -223,24 +223,47 @@ async def on_message(message: discord.Message) -> None:
         
         question_message = await channel.fetch_message(pending.message_id)
         
-        # Process the image URL (handle Tenor, Giphy, etc.)
-        processed_url = await process_image_url(image_url)
-        print(f"📎 Processed URL: {processed_url[:100]}...")
-        
-        # For video URLs (like Tenor), we need to let Discord create the embed
-        # Create a new message with the URL and let Discord auto-embed it
-        # Then link it visually by keeping both messages
-        if question_message.embeds:
-            old_embed = question_message.embeds[0]
+        # Check if the user's message has embeds (like Discord GIF picker creates)
+        # If so, we can add that embed to the question message
+        if message.embeds:
+            # Use the embed from the user's message directly
+            # This preserves the video field that Discord created
+            image_embed = message.embeds[0]
+            print(f"📎 Found embed in user message with video: {image_embed.video.url if image_embed.video else 'None'}")
             
-            # Send the GIF as a separate message right after the question
-            # This preserves Discord's native embed with animation
-            gif_message = await channel.send(processed_url)
-            print(f"📤 Sent GIF as separate message: {gif_message.id}")
+            # Get the existing question embed
+            if question_message.embeds:
+                question_embed = question_message.embeds[0]
+                
+                # Edit the message to include both embeds
+                # Discord allows multiple embeds in a single message
+                await question_message.edit(embeds=[question_embed, image_embed])
+                print(f"✏️  Added image embed to question message")
+        else:
+            # No embed in user message, try to create one with the image URL
+            processed_url = await process_image_url(image_url)
+            print(f"📎 Processed URL: {processed_url[:100]}...")
             
-            # Don't delete the gif_message - keep it visible
-            # Only delete the user's follow-up message
-            print(f"✏️  Kept GIF message visible, will only delete user's follow-up")
+            # For static images, we can attach them to the embed
+            if question_message.embeds:
+                old_embed = question_message.embeds[0]
+                
+                # Create new embed with the image
+                new_embed = discord.Embed(
+                    description=old_embed.description,
+                    color=old_embed.color,
+                    title=old_embed.title,
+                    url=old_embed.url
+                )
+                new_embed.set_image(url=processed_url)
+                
+                # Copy footer if it exists
+                if old_embed.footer:
+                    new_embed.set_footer(text=old_embed.footer.text, icon_url=old_embed.footer.icon_url)
+                
+                # Edit the question with the new embed
+                await question_message.edit(embed=new_embed)
+                print(f"✏️  Attached image to question embed")
             
             # Delete the follow-up image message
             try:
