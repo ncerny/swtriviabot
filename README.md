@@ -176,9 +176,33 @@ The bot supports adding images or GIFs to trivia questions. Here's what works:
 3. Paste that URL in the bot (format: `cdn.discordapp.com/...`)
 4. ✅ This always works and is the most reliable method!
 
+**✅ Easy Method - Use `/search-gif` Command:**
+
+The bot includes a built-in GIF search feature with two providers:
+
+1. **Giphy** - Popular GIF library
+   - Get free API key at: https://developers.giphy.com/
+   - Add to `.env`: `GIPHY_API_KEY=your_key_here`
+   - Free tier: 42 requests/hour
+
+2. **Klipy** - Comprehensive media library (recommended)
+   - Get free API key at: https://partner.klipy.com/api-keys
+   - Add to `.env`: `KLIPY_API_KEY=your_key_here`
+   - Free lifetime access, no rate limits
+   - Includes: GIFs, Video Clips, Stickers, and Memes
+   - Better quality and more variety than Giphy
+
+**How to use:**
+1. Type `/search-gif` in Discord
+2. Choose provider (Giphy or Klipy)
+3. Enter search term (e.g., "excited", "star wars")
+4. Click a result to copy the URL
+5. Paste the URL in `/post-question`
+
 **✅ Also Works:**
 
 - Giphy URLs (automatically converted to direct links)
+- Klipy URLs (direct media links)
 - Direct image URLs (ending in `.gif`, `.png`, `.jpg`, etc.)
 
 **❌ Tenor URLs - Currently Not Supported:**
@@ -186,14 +210,14 @@ The bot supports adding images or GIFs to trivia questions. Here's what works:
 - Tenor URLs (`tenor.com/view/...`) require Google Tenor API
 - **Google has made this API very difficult to enable** (known issue)
 - Even with billing enabled, many users get permission errors
-- We recommend using the Discord CDN method instead
+- We recommend using the Discord CDN method or `/search-gif` command instead
 
 **If you really want to try enabling Tenor API:**
 
 <details>
 <summary>Click to expand Tenor API troubleshooting (advanced)</summary>
 
-> ⚠️ **Warning**: This is known to fail even for project owners with billing enabled. Use Discord CDN instead.
+> ⚠️ **Warning**: This is known to fail even for project owners with billing enabled. Use Discord CDN or `/search-gif` instead.
 
 1. Get a Google Cloud API key from [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
 2. Try to enable Tenor API:
@@ -219,7 +243,7 @@ The bot supports adding images or GIFs to trivia questions. Here's what works:
 
 </details>
 
-**TL;DR**: Just use Discord CDN - it's easier and more reliable!
+**TL;DR**: Use Discord CDN for quick uploads, or use `/search-gif` with Klipy/Giphy for searching!
 
 ---
 
