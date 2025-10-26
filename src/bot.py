@@ -224,21 +224,29 @@ async def on_message(message: discord.Message) -> None:
         question_message = await channel.fetch_message(pending.message_id)
         
         # Check if the user's message has embeds (like Discord GIF picker creates)
-        # If so, we can add that embed to the question message
+        # If so, we can copy that embed and add the question text to it
         if message.embeds:
             # Use the embed from the user's message directly
             # This preserves the video field that Discord created
-            image_embed = message.embeds[0]
+            image_embed = message.embeds[0].copy()
             print(f"📎 Found embed in user message with video: {image_embed.video.url if image_embed.video else 'None'}")
             
-            # Get the existing question embed
+            # Get the existing question embed and add its text to the image embed
             if question_message.embeds:
                 question_embed = question_message.embeds[0]
                 
-                # Edit the message to include both embeds
-                # Discord allows multiple embeds in a single message
-                await question_message.edit(embeds=[question_embed, image_embed])
-                print(f"✏️  Added image embed to question message")
+                # Copy the question text into the image embed's description
+                # This combines the question with the GIF in a single embed
+                image_embed.description = question_embed.description
+                image_embed.color = question_embed.color
+                
+                # Copy footer if it exists
+                if question_embed.footer:
+                    image_embed.set_footer(text=question_embed.footer.text, icon_url=question_embed.footer.icon_url)
+                
+                # Replace the question embed with the merged embed
+                await question_message.edit(embed=image_embed)
+                print(f"✏️  Merged question text into image embed")
         else:
             # No embed in user message, try to create one with the image URL
             processed_url = await process_image_url(image_url)
