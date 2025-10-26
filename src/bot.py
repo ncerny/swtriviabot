@@ -227,29 +227,20 @@ async def on_message(message: discord.Message) -> None:
         processed_url = await process_image_url(image_url)
         print(f"📎 Processed URL: {processed_url[:100]}...")
         
-        # Update the embed - add URL to description so Discord auto-embeds it
-        # Discord embeds don't properly display video URLs via set_image()
+        # For video URLs (like Tenor), we need to let Discord create the embed
+        # Create a new message with the URL and let Discord auto-embed it
+        # Then link it visually by keeping both messages
         if question_message.embeds:
             old_embed = question_message.embeds[0]
             
-            # Create new embed with URL appended to description
-            # Discord will auto-embed the URL when it's in the description
-            new_description = f"{old_embed.description}\n\n{processed_url}"
+            # Send the GIF as a separate message right after the question
+            # This preserves Discord's native embed with animation
+            gif_message = await channel.send(processed_url)
+            print(f"📤 Sent GIF as separate message: {gif_message.id}")
             
-            new_embed = discord.Embed(
-                description=new_description,
-                color=old_embed.color,
-                title=old_embed.title,
-                url=old_embed.url
-            )
-            
-            # Copy footer if it exists
-            if old_embed.footer:
-                new_embed.set_footer(text=old_embed.footer.text, icon_url=old_embed.footer.icon_url)
-            
-            # Edit with the new embed
-            await question_message.edit(embed=new_embed)
-            print(f"✏️  Added URL to embed description for Discord auto-embed")
+            # Don't delete the gif_message - keep it visible
+            # Only delete the user's follow-up message
+            print(f"✏️  Kept GIF message visible, will only delete user's follow-up")
             
             # Delete the follow-up image message
             try:
