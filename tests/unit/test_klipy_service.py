@@ -170,10 +170,17 @@ class TestKlipyServiceSearchGifs:
     @pytest.mark.asyncio
     async def test_search_gifs_no_api_key(self):
         """Test search without API key raises ValueError."""
-        service = KlipyService(api_key=None)
-        
-        with pytest.raises(ValueError, match="Klipy API key not configured"):
-            await service.search_gifs(query="test", customer_id="user123")
+        # Mock environment variable to be None
+        with patch.dict('os.environ', {}, clear=False):
+            # Remove KLIPY_API_KEY if it exists
+            import os
+            if 'KLIPY_API_KEY' in os.environ:
+                del os.environ['KLIPY_API_KEY']
+            
+            service = KlipyService(api_key=None)
+            
+            with pytest.raises(ValueError, match="Klipy API key not configured"):
+                await service.search_gifs(query="test", customer_id="user123")
 
     @pytest.mark.asyncio
     async def test_search_gifs_no_customer_id(self, klipy_service):

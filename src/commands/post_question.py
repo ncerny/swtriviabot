@@ -6,6 +6,7 @@ from discord import app_commands, ui
 
 from src.services import answer_service, storage_service
 from src.services.tenor_service import get_tenor_service
+from src.services.image_tracker import get_image_tracker
 
 
 async def process_image_url(url: str) -> str:
@@ -205,10 +206,21 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
             view = AnswerButton()
 
             # Post question in the channel
-            await self.channel.send(
+            question_message = await self.channel.send(
                 embed=embed,
                 view=view,
             )
+
+            # If no image was provided, track this question for potential image attachment
+            if not (self.image_url.value and self.image_url.value.strip()):
+                image_tracker = get_image_tracker()
+                image_tracker.add_pending(
+                    user_id=interaction.user.id,
+                    channel_id=self.channel.id,
+                    message_id=question_message.id,
+                    guild_id=self.guild_id
+                )
+                print(f"📸 Tracking question {question_message.id} for image upload from user {interaction.user.id}")
 
             # Send previous answers to admin if they existed
             if previous_answers_message:

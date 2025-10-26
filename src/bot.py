@@ -17,8 +17,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.services import answer_service, storage_service
+from src.services.image_tracker import get_image_tracker
 from src.commands.list_answers import list_answers_command
-from src.commands.post_question import post_question_command, AnswerButton
+from src.commands.post_question import post_question_command, AnswerButton, process_image_url
 from src.commands.search_gif import search_gif_command
 # from src.commands.metrics import metrics_command  # TODO: Implement metrics command
 from src.utils.performance import get_metrics
@@ -101,6 +102,122 @@ async def on_ready() -> None:
 
     logger.info("Bot is ready!")
     print("🎮 Bot is ready!")
+
+
+@client.event
+async def on_message(message: discord.Message) -> None:
+    """Monitor messages for image posts to auto-attach to questions.
+    
+    When a user posts a question without an image, the bot tracks it.
+    If the user then posts a message with only an image within 3 minutes,
+    the bot will automatically attach that image to the question and
+    delete the follow-up message.
+    
+    Args:
+        message: The message that was posted
+    """
+    # Skip bot messages
+    if message.author.bot:
+        return
+    
+    # Only process messages in guilds
+    if not message.guild:
+        return
+    
+    # Check if this user has a pending image upload
+    image_tracker = get_image_tracker()
+    pending = image_tracker.get_pending(message.guild.id, message.author.id)
+    
+    if not pending:
+        return
+    
+    # Check if the pending upload has expired
+    if pending.is_expired():
+        image_tracker.remove_pending(message.guild.id, message.author.id)
+        print(f"⏰ Expired pending image upload for user {message.author.id}")
+        return
+    
+    # Check if message is in the same channel as the question
+    if message.channel.id != pending.channel_id:
+        return
+    
+    # Check if message has attachments or embeds with images
+    image_url = None
+    
+    # Check attachments first
+    if message.attachments:
+        for attachment in message.attachments:
+            if attachment.content_type and attachment.content_type.startswith('image/'):
+                image_url = attachment.url
+                break
+    
+    # Check embeds if no attachment found
+    if not image_url and message.embeds:
+        for embed in message.embeds:
+            if embed.image:
+                image_url = embed.image.url
+                break
+            elif embed.thumbnail:
+                image_url = embed.thumbnail.url
+                break
+    
+    # If no image found, ignore this message
+    if not image_url:
+        return
+    
+    # Check if message has minimal text content (allow empty or very short messages)
+    # This allows "here's the image" type messages but filters out regular conversation
+    text_content = message.content.strip() if message.content else ""
+    if len(text_content) > 50:  # If message has substantial text, don't auto-attach
+        return
+    
+    try:
+        # Fetch the original question message
+        channel = message.guild.get_channel(pending.channel_id)
+        if not channel or not isinstance(channel, discord.TextChannel):
+            print(f"⚠️  Could not find channel {pending.channel_id}")
+            image_tracker.remove_pending(message.guild.id, message.author.id)
+            return
+        
+        question_message = await channel.fetch_message(pending.message_id)
+        
+        # Process the image URL (handle Tenor, Giphy, etc.)
+        processed_url = await process_image_url(image_url)
+        
+        # Update the embed with the image
+        if question_message.embeds:
+            embed = question_message.embeds[0]
+            embed.set_image(url=processed_url)
+            
+            # Edit the message with the updated embed
+            await question_message.edit(embed=embed)
+            
+            # Delete the follow-up image message
+            try:
+                await message.delete()
+                print(f"✅ Auto-attached image to question {pending.message_id} and deleted follow-up message")
+            except discord.Forbidden:
+                print(f"⚠️  Could not delete follow-up message (missing permissions)")
+            except Exception as e:
+                print(f"⚠️  Could not delete follow-up message: {e}")
+            
+            # Remove from tracker
+            image_tracker.remove_pending(message.guild.id, message.author.id)
+            
+        else:
+            print(f"⚠️  Question message {pending.message_id} has no embeds")
+            image_tracker.remove_pending(message.guild.id, message.author.id)
+            
+    except discord.NotFound:
+        print(f"⚠️  Could not find question message {pending.message_id}")
+        image_tracker.remove_pending(message.guild.id, message.author.id)
+    except discord.Forbidden:
+        print(f"⚠️  Missing permissions to edit message {pending.message_id}")
+        image_tracker.remove_pending(message.guild.id, message.author.id)
+    except Exception as e:
+        logger.error(f"Error auto-attaching image: {e}", exc_info=True)
+        print(f"❌ Error auto-attaching image: {e}")
+        image_tracker.remove_pending(message.guild.id, message.author.id)
 
 
 @client.event
