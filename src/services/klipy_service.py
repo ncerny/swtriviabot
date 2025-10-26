@@ -78,12 +78,21 @@ class KlipyService:
         if locale:
             params["locale"] = locale
 
+        # Log the request for debugging
+        logger.info(f"🔍 Klipy search: query='{query}', customer_id={customer_id}, per_page={per_page}")
+        logger.debug(f"📤 Klipy API URL: {url}")
+        logger.debug(f"📤 Klipy params: {params}")
+
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.get(url, params=params) as response:
                     # Handle 204 No Content (empty results)
                     if response.status == 204:
-                        logger.info(f"✅ Klipy returned no results for query: {query}")
+                        logger.warning(
+                            f"⚠️  Klipy returned 204 No Content for query '{query}'. "
+                            f"This could mean: (1) No results found, (2) API key might be invalid, "
+                            f"(3) Klipy's content library might be limited, or (4) endpoint configuration issue."
+                        )
                         return []
                     
                     response.raise_for_status()
