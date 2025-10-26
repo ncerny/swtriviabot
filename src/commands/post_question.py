@@ -1,65 +1,27 @@
 """Slash command handler for /post-question command."""
 
-import re
 import discord
 from discord import app_commands, ui
 
 from src.services import answer_service, storage_service
-from src.services.tenor_service import get_tenor_service
 from src.services.image_tracker import get_image_tracker
 
 
 async def process_image_url(url: str) -> str:
     """Process image URL to ensure it's a direct link to the image.
     
-    Handles special cases like Tenor and Giphy URLs.
+    Simply returns the URL as-is since Discord handles most image URLs automatically.
     
     Args:
         url: The image URL provided by the user
         
     Returns:
-        A direct URL to the image file, or the original URL if no processing is needed
+        The URL stripped of whitespace
     """
     if not url or not url.strip():
         return url
-        
-    url = url.strip()
     
-    # Handle Giphy URLs - convert to direct media link
-    # Format: https://giphy.com/gifs/name-name-ABCDEFG123
-    if 'giphy.com/gifs/' in url:
-        # Extract the alphanumeric ID at the end
-        match = re.search(r'-([A-Za-z0-9]+)$', url.rstrip('/'))
-        if match:
-            gif_id = match.group(1)
-            return f"https://media.giphy.com/media/{gif_id}/giphy.gif"
-    
-    # Handle media.giphy.com URLs (these are already direct)
-    if 'media.giphy.com' in url:
-        return url
-    
-    # Handle Tenor URLs - try to convert to direct GIF URL using API
-    if 'tenor.com' in url:
-        tenor_service = get_tenor_service()
-        if tenor_service.is_configured():
-            direct_url = await tenor_service.get_gif_url_from_view_url(url)
-            if direct_url:
-                return direct_url
-            # If API call failed, fall back to original URL
-            print(f"⚠️  Tenor API call failed. Using original URL (Discord may not display preview): {url}")
-        else:
-            print("ℹ️  Tenor API not configured. Tenor URLs may not display properly.")
-            print("   To fix: Get a Tenor API key and add TENOR_API_KEY to .env")
-            print(f"   URL provided: {url}")
-        # Return original URL - Discord might still handle it
-        return url
-    
-    # If it's already a direct image URL, return as-is
-    if any(url.lower().endswith(ext) for ext in ['.gif', '.png', '.jpg', '.jpeg', '.webp', '.bmp']):
-        return url
-    
-    # For other cases, return original URL and let Discord try to handle it
-    return url
+    return url.strip()
 
 
 class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
@@ -91,7 +53,7 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
 
     image_url = ui.TextInput(
         label="Image URL (optional)",
-        placeholder="Giphy URL or upload to Discord & copy image address",
+        placeholder="Direct URL to image, or leave blank to post image next",
         required=False,
         max_length=500,
         style=discord.TextStyle.short,

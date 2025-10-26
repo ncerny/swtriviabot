@@ -20,7 +20,6 @@ from src.services import answer_service, storage_service
 from src.services.image_tracker import get_image_tracker
 from src.commands.list_answers import list_answers_command
 from src.commands.post_question import post_question_command, AnswerButton, process_image_url
-from src.commands.search_gif import search_gif_command
 # from src.commands.metrics import metrics_command  # TODO: Implement metrics command
 from src.utils.performance import get_metrics
 
@@ -55,7 +54,6 @@ tree = app_commands.CommandTree(client)
 # Register commands
 tree.add_command(list_answers_command)
 tree.add_command(post_question_command)
-tree.add_command(search_gif_command)
 # tree.add_command(metrics_command)  # TODO: Implement metrics command
 
 

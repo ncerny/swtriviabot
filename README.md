@@ -197,90 +197,24 @@ python check_tracker.py
 
 The bot supports adding images or GIFs to trivia questions. Here's what works:
 
-**✅ Recommended Method - Discord CDN:**
+**✅ Recommended Methods:**
 
-1. Send your GIF in any Discord channel
-2. Right-click the GIF → "Copy Image Address"
-3. Paste that URL in the bot (format: `cdn.discordapp.com/...`)
-4. ✅ This always works and is the most reliable method!
+1. **Upload directly to Discord** (automatic):
+   - Post question without image URL
+   - Within 3 minutes, post an image in the same channel
+   - Bot automatically attaches it and cleans up your follow-up message
+   - Works with file uploads or image URLs
 
-**✅ Easy Method - Use `/search-gif` Command:**
+2. **Discord CDN** (manual):
+   - Send your GIF in any Discord channel
+   - Right-click the GIF → "Copy Image Address"
+   - Paste that URL in the image field (format: `cdn.discordapp.com/...`)
+   - Most reliable for direct URLs
 
-The bot includes a built-in GIF search feature with two providers:
-
-1. **Giphy** - Popular GIF library (✅ Recommended - Works Well)
-
-   - Get free API key at: https://developers.giphy.com/
-   - Add to `.env`: `GIPHY_API_KEY=your_key_here`
-   - Free tier: 42 requests/hour
-   - ✅ Reliable and well-tested
-
-2. **Klipy** - Comprehensive media library (⚠️ Experimental)
-   - Get free API key at: https://partner.klipy.com/api-keys
-   - **IMPORTANT**: Create a **Production** API key, NOT a Testing/Sandbox key
-   - Testing keys have no content and will return empty results
-   - Add to `.env`: `KLIPY_API_KEY=your_production_key_here`
-   - Free lifetime access, no rate limits
-   - Includes: GIFs, Video Clips, Stickers, and Memes
-   - ⚠️ **Known Issues**:
-     - Testing/Sandbox API keys return no results (they have no content)
-     - Must use Production API key to access the GIF library
-     - Some users report limited results - service may be newer/smaller library
-   - If Klipy doesn't work for you, use Giphy instead
-
-**How to use:**
-
-1. Type `/search-gif` in Discord
-2. Choose provider (Giphy or Klipy)
-3. Enter search term (e.g., "excited", "star wars")
-4. Click a result to copy the URL
-5. Paste the URL in `/post-question`
-
-**✅ Also Works:**
-
-- Giphy URLs (automatically converted to direct links)
-- Klipy URLs (direct media links)
-- Direct image URLs (ending in `.gif`, `.png`, `.jpg`, etc.)
-
-**❌ Tenor URLs - Currently Not Supported:**
-
-- Tenor URLs (`tenor.com/view/...`) require Google Tenor API
-- **Google has made this API very difficult to enable** (known issue)
-- Even with billing enabled, many users get permission errors
-- We recommend using the Discord CDN method or `/search-gif` command instead
-
-**If you really want to try enabling Tenor API:**
-
-<details>
-<summary>Click to expand Tenor API troubleshooting (advanced)</summary>
-
-> ⚠️ **Warning**: This is known to fail even for project owners with billing enabled. Use Discord CDN or `/search-gif` instead.
-
-1. Get a Google Cloud API key from [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
-2. Try to enable Tenor API:
-   ```bash
-   gcloud services enable tenor.googleapis.com
-   ```
-3. If you get "PERMISSION_DENIED" even as project owner:
-   - This is a known Google Cloud issue
-   - The API exists but the enablement mechanism is broken
-   - No known workaround exists currently
-4. If it works (rare), add to `.env`:
-   ```
-   TENOR_API_KEY=your_api_key_here
-   ```
-
-**Why this happens:**
-
-- Tenor API exists (`tenor.googleapis.com`) but doesn't appear in API Library
-- Direct enablement URLs result in "Failed to load" errors
-- REST API enablement returns error code 110002 (billing/quota issue)
-- Even unrestricted API keys fail with SERVICE_DISABLED
-- Google's documentation mentions the API but it's not publicly accessible
-
-</details>
-
-**TL;DR**: Use Discord CDN for quick uploads, or use `/search-gif` with Klipy/Giphy for searching!
+3. **Any direct image URL**:
+   - URLs ending in `.gif`, `.png`, `.jpg`, `.jpeg`, `.webp`, etc.
+   - Works with most image hosting services
+   - Just paste the direct link to the image
 
 ---
 
