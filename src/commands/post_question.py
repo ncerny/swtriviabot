@@ -97,7 +97,7 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
         style=discord.TextStyle.short,
     )
 
-    def __init__(self, guild_id: str, channel: discord.TextChannel):
+    def __init__(self, guild_id: int, channel: discord.TextChannel):
         super().__init__()
         self.guild_id = guild_id
         self.channel = channel
@@ -220,7 +220,7 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
                     message_id=question_message.id,
                     guild_id=self.guild_id
                 )
-                print(f"📸 Tracking question {question_message.id} for image upload from user {interaction.user.id}")
+                print(f"📸 Tracking question {question_message.id} for image upload from user {interaction.user.id} in guild {self.guild_id}")
 
             # Send previous answers to admin if they existed
             if previous_answers_message:
@@ -365,10 +365,10 @@ async def post_question_command(interaction: discord.Interaction) -> None:
     """
     try:
         # Get guild context
-        guild_id = str(interaction.guild_id) if interaction.guild_id else "DM"
+        guild_id = interaction.guild_id
 
         # Validate guild context (quick check, no await)
-        if guild_id == "DM":
+        if not guild_id:
             await interaction.response.send_message(
                 "❌ This command can only be used in a server, not in DMs",
                 ephemeral=True,
