@@ -52,18 +52,18 @@ jobs:
           ARTIFACT_SIZE=$(ls -lh artifact-build/swtriviabot-${{ github.event.release.tag_name }}.tar.gz | awk '{print $5}')
           CURRENT_BODY=$(gh release view ${{ github.event.release.tag_name }} --json body -q .body)
           
-          ARTIFACT_INFO="
+          cat >> release-notes-append.md << 'ARTIFACT_EOF'
 
 ---
 
 ## 📦 Deployment Artifact
 
-**File**: \`swtriviabot-${{ github.event.release.tag_name }}.tar.gz\` (${ARTIFACT_SIZE})
+**File**: `swtriviabot-${{ github.event.release.tag_name }}.tar.gz` (SIZE_PLACEHOLDER)
 
 **Contents**: Production-ready code (excludes tests, development tools, and documentation)
 
 **Deploy**:
-\`\`\`bash
+```bash
 # Download and extract
 curl -LO https://github.com/${{ github.repository }}/releases/download/${{ github.event.release.tag_name }}/swtriviabot-${{ github.event.release.tag_name }}.tar.gz
 tar -xzf swtriviabot-${{ github.event.release.tag_name }}.tar.gz
@@ -74,7 +74,11 @@ python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 python -m src.bot
-\`\`\`
-"
+```
+ARTIFACT_EOF
           
-          echo "${CURRENT_BODY}${ARTIFACT_INFO}" | gh release edit ${{ github.event.release.tag_name }} --notes-file -
+          sed -i.bak "s/SIZE_PLACEHOLDER/${ARTIFACT_SIZE}/" release-notes-append.md
+          
+          echo "${CURRENT_BODY}" > full-release-notes.md
+          cat release-notes-append.md >> full-release-notes.md
+          gh release edit ${{ github.event.release.tag_name }} --notes-file full-release-notes.md
