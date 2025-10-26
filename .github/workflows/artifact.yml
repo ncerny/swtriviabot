@@ -1,0 +1,80 @@
+name: Build Artifact
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  build-artifact:
+    name: Build and Upload Artifact
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create production artifact
+        run: |
+          # Create temporary directory for artifact contents
+          mkdir -p artifact-build
+          
+          # Copy production files (exclusions based on .github/.artifactignore)
+          tar --exclude-from=.github/.artifactignore \
+              --exclude='artifact-build' \
+              -czf artifact-build/swtriviabot-${{ github.event.release.tag_name }}.tar.gz \
+              .
+
+      - name: Verify artifact contents
+        run: |
+          echo "Artifact created: swtriviabot-${{ github.event.release.tag_name }}.tar.gz"
+          echo "Artifact size:"
+          ls -lh artifact-build/swtriviabot-${{ github.event.release.tag_name }}.tar.gz
+          echo ""
+          echo "Artifact contents preview:"
+          tar -tzf artifact-build/swtriviabot-${{ github.event.release.tag_name }}.tar.gz | head -n 50
+
+      - name: Upload artifact to release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload ${{ github.event.release.tag_name }} \
+            artifact-build/swtriviabot-${{ github.event.release.tag_name }}.tar.gz \
+            --clobber
+
+      - name: Add artifact info to release notes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ARTIFACT_SIZE=$(ls -lh artifact-build/swtriviabot-${{ github.event.release.tag_name }}.tar.gz | awk '{print $5}')
+          CURRENT_BODY=$(gh release view ${{ github.event.release.tag_name }} --json body -q .body)
+          
+          ARTIFACT_INFO="
+
+---
+
+## 📦 Deployment Artifact
+
+**File**: \`swtriviabot-${{ github.event.release.tag_name }}.tar.gz\` (${ARTIFACT_SIZE})
+
+**Contents**: Production-ready code (excludes tests, development tools, and documentation)
+
+**Deploy**:
+\`\`\`bash
+# Download and extract
+curl -LO https://github.com/${{ github.repository }}/releases/download/${{ github.event.release.tag_name }}/swtriviabot-${{ github.event.release.tag_name }}.tar.gz
+tar -xzf swtriviabot-${{ github.event.release.tag_name }}.tar.gz
+cd swtriviabot-${{ github.event.release.tag_name }}
+
+# Install dependencies and run
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python -m src.bot
+\`\`\`
+"
+          
+          echo "${CURRENT_BODY}${ARTIFACT_INFO}" | gh release edit ${{ github.event.release.tag_name }} --notes-file -
