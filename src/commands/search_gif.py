@@ -69,10 +69,21 @@ class GIFSearchModal(ui.Modal, title="Search for a GIF"):
             return  # Error message already sent
         
         if not results:
-            await interaction.followup.send(
-                f"❌ No GIFs found for '{query}'\n\nTry a different search term!",
-                ephemeral=True
-            )
+            # Provide more helpful error message for Klipy
+            if self.provider == "klipy":
+                await interaction.followup.send(
+                    f"❌ No GIFs found for '{query}'\n\n"
+                    f"**If you're getting no results for every search:**\n"
+                    f"• Your API key might be for 'Testing/Sandbox' (which has no content)\n"
+                    f"• Create a **Production** API key at: https://partner.klipy.com/api-keys\n"
+                    f"• Or try using Giphy instead (select Giphy button when using /search-gif)",
+                    ephemeral=True
+                )
+            else:
+                await interaction.followup.send(
+                    f"❌ No GIFs found for '{query}'\n\nTry a different search term!",
+                    ephemeral=True
+                )
             return
         
         # Show results with selection buttons

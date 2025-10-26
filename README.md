@@ -188,13 +188,15 @@ The bot includes a built-in GIF search feature with two providers:
 
 2. **Klipy** - Comprehensive media library (⚠️ Experimental)
    - Get free API key at: https://partner.klipy.com/api-keys
-   - Add to `.env`: `KLIPY_API_KEY=your_key_here`
+   - **IMPORTANT**: Create a **Production** API key, NOT a Testing/Sandbox key
+   - Testing keys have no content and will return empty results
+   - Add to `.env`: `KLIPY_API_KEY=your_production_key_here`
    - Free lifetime access, no rate limits
    - Includes: GIFs, Video Clips, Stickers, and Memes
-   - ⚠️ **Note**: Some users report getting empty results on all searches. This may indicate:
-     - Limited content library (newer service)
-     - API key validation issues
-     - Regional content restrictions
+   - ⚠️ **Known Issues**:
+     - Testing/Sandbox API keys return no results (they have no content)
+     - Must use Production API key to access the GIF library
+     - Some users report limited results - service may be newer/smaller library
    - If Klipy doesn't work for you, use Giphy instead
 
 **How to use:**

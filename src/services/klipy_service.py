@@ -90,8 +90,13 @@ class KlipyService:
                     if response.status == 204:
                         logger.warning(
                             f"⚠️  Klipy returned 204 No Content for query '{query}'. "
-                            f"This could mean: (1) No results found, (2) API key might be invalid, "
-                            f"(3) Klipy's content library might be limited, or (4) endpoint configuration issue."
+                            f"Possible causes:\n"
+                            f"  1. API key is for 'Testing/Sandbox' environment (has no content) - "
+                            f"create a Production API key instead\n"
+                            f"  2. No results found for this search term\n"
+                            f"  3. API key might be invalid or expired\n"
+                            f"  4. Regional content restrictions\n"
+                            f"Get a Production API key at: https://partner.klipy.com/api-keys"
                         )
                         return []
                     
