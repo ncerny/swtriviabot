@@ -81,6 +81,11 @@ class KlipyService:
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.get(url, params=params) as response:
+                    # Handle 204 No Content (empty results)
+                    if response.status == 204:
+                        logger.info(f"✅ Klipy returned no results for query: {query}")
+                        return []
+                    
                     response.raise_for_status()
                     data = await response.json()
 

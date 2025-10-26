@@ -230,6 +230,19 @@ class TestKlipyServiceSearchGifs:
         assert results == []
 
     @pytest.mark.asyncio
+    async def test_search_gifs_204_no_content(self, klipy_service):
+        """Test handling of 204 No Content response (empty results)."""
+        mock_response = create_mock_response(204, json_data=None)
+        mock_session = create_mock_session(mock_response)
+
+        with patch("aiohttp.ClientSession", return_value=mock_session):
+            results = await klipy_service.search_gifs(
+                query="nonexistent", customer_id="user123"
+            )
+
+        assert results == []
+
+    @pytest.mark.asyncio
     async def test_search_gifs_missing_hd_format(self, klipy_service):
         """Test fallback when HD format is not available."""
         mock_response_data = {
