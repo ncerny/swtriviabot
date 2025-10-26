@@ -3,6 +3,7 @@
 [![PR Tests](https://github.com/ncerny/swtriviabot/actions/workflows/pr-tests.yml/badge.svg)](https://github.com/ncerny/swtriviabot/actions/workflows/pr-tests.yml)
 [![Release](https://github.com/ncerny/swtriviabot/actions/workflows/release.yml/badge.svg)](https://github.com/ncerny/swtriviabot/actions/workflows/release.yml)
 [![Build Artifact](https://github.com/ncerny/swtriviabot/actions/workflows/artifact.yml/badge.svg)](https://github.com/ncerny/swtriviabot/actions/workflows/artifact.yml)
+[![Latest Release](https://img.shields.io/github/v/release/ncerny/swtriviabot)](https://github.com/ncerny/swtriviabot/releases/latest)
 
 A Discord bot for managing trivia game answers with slash commands. Players submit answers, admins view and reset sessions.
 
