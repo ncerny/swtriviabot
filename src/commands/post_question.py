@@ -79,7 +79,7 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
 
     image_url = ui.TextInput(
         label="Image URL (optional)",
-        placeholder="Must be direct image URL ending in .gif, .png, etc.",
+        placeholder="Upload GIF to Discord, then Copy Image Address. Leave blank if none.",
         required=False,
         max_length=500,
         style=discord.TextStyle.short,
