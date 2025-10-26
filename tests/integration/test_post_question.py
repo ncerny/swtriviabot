@@ -266,13 +266,16 @@ async def test_answer_modal_submit_new_answer(mock_interaction, tmp_path):
     
     await modal.on_submit(mock_interaction)
     
+    # Verify response was deferred
+    mock_interaction.response.defer.assert_called_once_with(ephemeral=True)
+    
     # Verify answer was recorded
     session = answer_service.get_session(guild_id)
     assert user_id in session.answers
     assert session.answers[user_id].text == "Paris"
     
-    # Verify success message
-    call_args = mock_interaction.response.send_message.call_args
+    # Verify success message via followup
+    call_args = mock_interaction.followup.send.call_args
     assert "✅" in call_args[0][0]
     assert "recorded" in call_args[0][0]
 
@@ -296,12 +299,15 @@ async def test_answer_modal_update_existing_answer(mock_interaction, tmp_path):
     
     await modal.on_submit(mock_interaction)
     
+    # Verify response was deferred
+    mock_interaction.response.defer.assert_called_once_with(ephemeral=True)
+    
     # Verify answer was updated
     session = answer_service.get_session(guild_id)
     assert session.answers[user_id].text == "Updated answer"
     
-    # Verify update message
-    call_args = mock_interaction.response.send_message.call_args
+    # Verify update message via followup
+    call_args = mock_interaction.followup.send.call_args
     assert "🔄" in call_args[0][0]
     assert "updating" in call_args[0][0].lower()
 
@@ -324,8 +330,11 @@ async def test_answer_modal_validation_error(mock_interaction, tmp_path):
     
     await modal.on_submit(mock_interaction)
     
-    # Verify error message
-    call_args = mock_interaction.response.send_message.call_args
+    # Verify response was deferred
+    mock_interaction.response.defer.assert_called_once_with(ephemeral=True)
+    
+    # Verify error message via followup
+    call_args = mock_interaction.followup.send.call_args
     assert "❌" in call_args[0][0]
     assert call_args[1]["ephemeral"] is True
 

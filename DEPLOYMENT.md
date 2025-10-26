@@ -57,6 +57,7 @@ python -m src.bot
 ```
 
 **Advantages of Artifact Deployment:**
+
 - ✅ 30-50% smaller download (no tests, docs, or dev tools)
 - ✅ Faster deployment (fewer files to transfer)
 - ✅ Production-ready (only runtime code included)
@@ -85,16 +86,19 @@ Ensure your repository has the following files:
 ### pella.app Configuration
 
 1. **Create Application**
+
    - Go to [pella.app](https://pella.app) and sign up/log in
    - Click "New Application"
    - Connect your Git repository OR upload artifact
 
 2. **Environment Variables**
+
    - Go to "Settings" → "Environment Variables"
    - Add `DISCORD_BOT_TOKEN` with your bot token value
    - Save changes
 
 3. **Persistent Storage**
+
    - Go to "Settings" → "Volumes"
    - Add volume: `/app/data` (100MB)
    - Save changes

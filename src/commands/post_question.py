@@ -186,6 +186,9 @@ class AnswerModal(ui.Modal, title="Submit Your Trivia Answer"):
     async def on_submit(self, interaction: discord.Interaction) -> None:
         """Handle modal submission."""
         try:
+            # Defer the response to prevent action menu from appearing
+            await interaction.response.defer(ephemeral=True)
+            
             # Submit or update answer
             answer, is_update = answer_service.submit_answer(
                 guild_id=self.guild_id,
@@ -199,21 +202,21 @@ class AnswerModal(ui.Modal, title="Submit Your Trivia Answer"):
             if session:
                 storage_service.save_session_to_disk(self.guild_id, session)
 
-            # Send appropriate response
+            # Send appropriate response via followup
             if is_update:
                 message = "🔄 You've already answered this question - updating your answer!"
             else:
                 message = "✅ Your answer has been recorded!"
 
-            await interaction.response.send_message(message, ephemeral=True)
+            await interaction.followup.send(message, ephemeral=True)
 
         except ValueError as e:
             # Validation errors
-            await interaction.response.send_message(f"❌ {str(e)}", ephemeral=True)
+            await interaction.followup.send(f"❌ {str(e)}", ephemeral=True)
         except Exception as e:
             # Unexpected errors
             print(f"Error in answer modal: {e}")
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 "❌ Something went wrong, please try again",
                 ephemeral=True,
             )
