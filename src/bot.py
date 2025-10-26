@@ -229,13 +229,27 @@ async def on_message(message: discord.Message) -> None:
         
         # Update the embed with the image
         if question_message.embeds:
-            embed = question_message.embeds[0]
-            print(f"📋 Original embed has image: {embed.image.url if embed.image else 'None'}")
-            embed.set_image(url=processed_url)
-            print(f"📋 After set_image, embed.image.url: {embed.image.url[:100] if embed.image else 'None'}...")
+            old_embed = question_message.embeds[0]
+            print(f"📋 Original embed has image: {old_embed.image.url if old_embed.image else 'None'}")
             
-            # Edit the message with the updated embed
-            await question_message.edit(embed=embed)
+            # Create a new embed with all the same properties plus the image
+            # This works better than modifying existing embed that had no image
+            new_embed = discord.Embed(
+                description=old_embed.description,
+                color=old_embed.color,
+                title=old_embed.title,
+                url=old_embed.url
+            )
+            new_embed.set_image(url=processed_url)
+            
+            # Copy footer if it exists
+            if old_embed.footer:
+                new_embed.set_footer(text=old_embed.footer.text, icon_url=old_embed.footer.icon_url)
+            
+            print(f"📋 New embed created with image: {new_embed.image.url[:100]}...")
+            
+            # Edit the message with the new embed
+            await question_message.edit(embed=new_embed)
             print(f"✏️  Edited question message with new embed")
             
             # Delete the follow-up image message
