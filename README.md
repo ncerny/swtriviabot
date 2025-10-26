@@ -165,6 +165,58 @@ Example response:
 - Review error logs for Python exceptions
 - Ensure Python 3.13+ is installed: `python3 --version`
 
+### Images/GIFs not displaying in questions
+
+The bot supports adding images or GIFs to trivia questions. Here's what works:
+
+**✅ Working Image URLs:**
+- Direct image URLs (ending in `.gif`, `.png`, `.jpg`, etc.)
+- Giphy URLs (automatically converted to direct links)
+- Discord CDN URLs (`cdn.discordapp.com`)
+
+**⚠️ Tenor URLs (requires API key):**
+- Tenor URLs (`tenor.com/view/...`) require a Tenor API key
+- Without API key: URLs are used as-is (may not display)
+- With API key: Automatically converted to direct GIF URLs
+
+**How to enable Tenor support:**
+
+1. Get a Google Cloud API key from [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
+2. **Enable Tenor API** (this is where most people get stuck):
+   - The Tenor API might not appear in the API Library search
+   - Try these troubleshooting steps:
+   
+   **Option A: Use the error message URL**
+   ```bash
+   # Test your API key to get the enablement URL
+   curl "https://tenor.googleapis.com/v2/search?q=test&key=YOUR_API_KEY&limit=1"
+   ```
+   - The error will include a direct link to enable the API for your project
+   - Visit that URL and click "ENABLE"
+   
+   **Option B: Direct enablement URL**
+   - Replace `YOUR_PROJECT_ID` with your Google Cloud project ID:
+   ```
+   https://console.developers.google.com/apis/api/tenor.googleapis.com?project=YOUR_PROJECT_ID
+   ```
+   
+   **Option C: Use an unrestricted API key**
+   - In Google Cloud Console → APIs & Services → Credentials
+   - Create a new API key
+   - Don't restrict it (or only restrict by IP/HTTP referrer, not by API)
+   - This is less secure but works if the Tenor API won't enable
+
+3. Add to your `.env` file:
+   ```
+   TENOR_API_KEY=your_api_key_here
+   ```
+
+4. Restart the bot
+
+**Workaround if Tenor API won't enable:**
+- Users can upload GIFs directly to Discord, then right-click → "Copy Image Address"
+- Use the Discord CDN URL (these always work)
+
 ---
 
 ## Development

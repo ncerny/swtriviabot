@@ -45,9 +45,12 @@ async def process_image_url(url: str) -> str:
             if direct_url:
                 return direct_url
             # If API call failed, fall back to original URL
-            print(f"Falling back to original Tenor URL: {url}")
+            print(f"⚠️  Tenor API call failed. Using original URL (Discord may not display preview): {url}")
         else:
-            print("Tenor API not configured, using original URL")
+            print("ℹ️  Tenor API not configured. Tenor URLs may not display properly.")
+            print("   To fix: Get a Tenor API key and add TENOR_API_KEY to .env")
+            print(f"   URL provided: {url}")
+        # Return original URL - Discord might still handle it
         return url
     
     # If it's already a direct image URL, return as-is
