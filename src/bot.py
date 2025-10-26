@@ -227,42 +227,14 @@ async def on_message(message: discord.Message) -> None:
         processed_url = await process_image_url(image_url)
         print(f"📎 Processed URL: {processed_url[:100]}...")
         
-        # Update the embed with the image
+        # Update the message - add URL to content so Discord auto-embeds it
+        # Discord embeds don't properly display video URLs via set_image()
         if question_message.embeds:
             old_embed = question_message.embeds[0]
-            print(f"📋 Original embed has image: {old_embed.image.url if old_embed.image else 'None'}")
             
-            # Create a new embed with all the same properties plus the image
-            # This works better than modifying existing embed that had no image
-            # For animated GIFs from Tenor, set the URL field to enable video playback
-            new_embed = discord.Embed(
-                description=old_embed.description,
-                color=old_embed.color,
-                title=old_embed.title,
-                url=processed_url if processed_url.endswith('.gif') else old_embed.url
-            )
-            new_embed.set_image(url=processed_url)
-            print(f"🎬 Created embed with image URL: {processed_url[:100]}...")
-            
-            # Copy footer if it exists
-            if old_embed.footer:
-                new_embed.set_footer(text=old_embed.footer.text, icon_url=old_embed.footer.icon_url)
-            
-            print(f"📋 New embed created with image: {new_embed.image.url[:100]}...")
-            
-            # Fetch the message again to get the view
-            question_message = await channel.fetch_message(pending.message_id)
-            
-            # Edit the message with the new embed, preserving content and view
-            await question_message.edit(embed=new_embed)
-            print(f"✏️  Edited question message with new embed")
-            
-            # Verify the edit worked by fetching again
-            updated_message = await channel.fetch_message(pending.message_id)
-            if updated_message.embeds and updated_message.embeds[0].image:
-                print(f"✅ Verified: Message now has image: {updated_message.embeds[0].image.url[:100]}...")
-            else:
-                print(f"❌ ERROR: Message still has no image after edit!")
+            # Add the URL as message content - Discord will auto-embed it
+            await question_message.edit(content=processed_url, embed=old_embed)
+            print(f"✏️  Added URL to message content for Discord auto-embed")
             
             # Delete the follow-up image message
             try:
