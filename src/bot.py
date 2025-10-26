@@ -168,16 +168,28 @@ async def on_message(message: discord.Message) -> None:
             image_url = text
             print(f"🖼️  Found image URL in message text: {image_url[:100]}...")
     
-    # 3. Check embeds as last resort (might lose animation)
+    # 3. Check embeds (Discord GIF picker uses embeds with video URLs)
     if not image_url and message.embeds:
         for embed in message.embeds:
-            if embed.image:
-                image_url = embed.image.url
-                print(f"⚠️  Using embed image (may lose animation): {image_url[:100]}...")
+            # Discord GIF picker embeds have video field with the animated GIF
+            if embed.video:
+                image_url = embed.video.url
+                print(f"🖼️  Found animated GIF from embed video: {image_url[:100]}...")
                 break
+            # Some embeds use the main URL for the GIF (Tenor)
+            elif embed.url and any(embed.url.lower().endswith(ext) for ext in ['.gif', '.mp4', '.webm']):
+                image_url = embed.url
+                print(f"🖼️  Found animated content from embed URL: {image_url[:100]}...")
+                break
+            # Regular image embed
+            elif embed.image:
+                image_url = embed.image.url
+                print(f"🖼️  Found image from embed: {image_url[:100]}...")
+                break
+            # Thumbnail as last resort (often static preview)
             elif embed.thumbnail:
                 image_url = embed.thumbnail.url
-                print(f"⚠️  Using embed thumbnail (may lose animation): {image_url[:100]}...")
+                print(f"⚠️  Using embed thumbnail (may be static): {image_url[:100]}...")
                 break
     
     # If no image found, ignore this message
