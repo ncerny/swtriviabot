@@ -48,26 +48,28 @@ jobs:
       - name: Add artifact info to release notes
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ github.event.release.tag_name }}
+          REPO: ${{ github.repository }}
         run: |
-          ARTIFACT_SIZE=$(ls -lh artifact-build/swtriviabot-${{ github.event.release.tag_name }}.tar.gz | awk '{print $5}')
-          CURRENT_BODY=$(gh release view ${{ github.event.release.tag_name }} --json body -q .body)
+          ARTIFACT_SIZE=$(ls -lh artifact-build/swtriviabot-${TAG_NAME}.tar.gz | awk '{print $5}')
+          CURRENT_BODY=$(gh release view ${TAG_NAME} --json body -q .body)
           
-          cat >> release-notes-append.md << 'ARTIFACT_EOF'
+          cat > release-notes-append.md << 'ARTIFACT_EOF'
 
 ---
 
 ## 📦 Deployment Artifact
 
-**File**: `swtriviabot-${{ github.event.release.tag_name }}.tar.gz` (SIZE_PLACEHOLDER)
+**File**: `swtriviabot-TAG_PLACEHOLDER.tar.gz` (SIZE_PLACEHOLDER)
 
 **Contents**: Production-ready code (excludes tests, development tools, and documentation)
 
 **Deploy**:
 ```bash
 # Download and extract
-curl -LO https://github.com/${{ github.repository }}/releases/download/${{ github.event.release.tag_name }}/swtriviabot-${{ github.event.release.tag_name }}.tar.gz
-tar -xzf swtriviabot-${{ github.event.release.tag_name }}.tar.gz
-cd swtriviabot-${{ github.event.release.tag_name }}
+curl -LO https://github.com/REPO_PLACEHOLDER/releases/download/TAG_PLACEHOLDER/swtriviabot-TAG_PLACEHOLDER.tar.gz
+tar -xzf swtriviabot-TAG_PLACEHOLDER.tar.gz
+cd swtriviabot-TAG_PLACEHOLDER
 
 # Install dependencies and run
 python -m venv .venv
@@ -77,8 +79,12 @@ python -m src.bot
 ```
 ARTIFACT_EOF
           
-          sed -i.bak "s/SIZE_PLACEHOLDER/${ARTIFACT_SIZE}/" release-notes-append.md
+          # Replace placeholders
+          sed -i.bak "s/SIZE_PLACEHOLDER/${ARTIFACT_SIZE}/g" release-notes-append.md
+          sed -i.bak "s/TAG_PLACEHOLDER/${TAG_NAME}/g" release-notes-append.md
+          sed -i.bak "s|REPO_PLACEHOLDER|${REPO}|g" release-notes-append.md
           
+          # Combine with existing release notes
           echo "${CURRENT_BODY}" > full-release-notes.md
           cat release-notes-append.md >> full-release-notes.md
-          gh release edit ${{ github.event.release.tag_name }} --notes-file full-release-notes.md
+          gh release edit ${TAG_NAME} --notes-file full-release-notes.md
