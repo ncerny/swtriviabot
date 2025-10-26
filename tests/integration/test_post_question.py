@@ -340,22 +340,6 @@ async def test_answer_modal_validation_error(mock_interaction, tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_add_image_button_view():
-    """Test that AddImageButton view is created correctly."""
-    from src.commands.post_question import AddImageButton
-    mock_channel = Mock()
-    
-    button_view = AddImageButton(question_message_id=12345, channel=mock_channel)
-    
-    # Verify timeout is set (ephemeral, not persistent)
-    assert button_view.timeout == 300
-    
-    # Verify message ID and channel are stored
-    assert button_view.question_message_id == 12345
-    assert button_view.channel == mock_channel
-
-
-@pytest.mark.asyncio
 async def test_answer_button_persistent_view():
     """Test that AnswerButton is configured as persistent view."""
     button = AnswerButton()

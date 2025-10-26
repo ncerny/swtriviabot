@@ -79,7 +79,7 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
 
     image_url = ui.TextInput(
         label="Image URL (optional)",
-        placeholder="Leave blank to add image after posting with 'Add Image' button",
+        placeholder="Must be direct image URL ending in .gif, .png, etc.",
         required=False,
         max_length=500,
         style=discord.TextStyle.short,
@@ -194,37 +194,21 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
             view = AnswerButton()
 
             # Post question in the channel
-            question_message = await self.channel.send(
+            await self.channel.send(
                 embed=embed,
                 view=view,
             )
 
-            # Create view with "Add Image" button if no image was provided
-            add_image_view = None
-            if not (self.image_url.value and self.image_url.value.strip()):
-                add_image_view = AddImageButton(
-                    question_message_id=question_message.id,
-                    channel=self.channel
-                )
-
             # Send previous answers to admin if they existed
             if previous_answers_message:
-                followup_message = previous_answers_message
-                if add_image_view:
-                    followup_message += "\n\n💡 Want to add an image? Click the button below!"
                 await interaction.followup.send(
-                    followup_message,
+                    previous_answers_message,
                     ephemeral=True,
-                    view=add_image_view
                 )
             else:
-                followup_message = "✅ Question posted!\n\n_No previous answers to display._"
-                if add_image_view:
-                    followup_message += "\n\n💡 Want to add an image? Click the button below!"
                 await interaction.followup.send(
-                    followup_message,
+                    "✅ Question posted!\n\n_No previous answers to display._",
                     ephemeral=True,
-                    view=add_image_view
                 )
 
         except ValueError as e:
@@ -338,114 +322,6 @@ class AnswerButton(ui.View):
         except Exception as e:
             print(f"Error in submit answer button: {e}")
             # Check if we can still respond
-            if not interaction.response.is_done():
-                await interaction.response.send_message(
-                    "❌ Something went wrong, please try again",
-                    ephemeral=True,
-                )
-
-
-class AddImageModal(ui.Modal, title="Add Image to Question"):
-    """Modal for adding an image URL to the question."""
-
-    image_url = ui.TextInput(
-        label="Image URL",
-        placeholder="Paste direct image URL (ending in .gif, .png, .jpg, etc.)",
-        required=True,
-        max_length=500,
-        style=discord.TextStyle.short,
-    )
-
-    def __init__(self, question_message_id: int, channel: discord.TextChannel):
-        super().__init__()
-        self.question_message_id = question_message_id
-        self.channel = channel
-
-    async def on_submit(self, interaction: discord.Interaction) -> None:
-        """Handle adding image to the question."""
-        try:
-            await interaction.response.defer(ephemeral=True)
-
-            # Fetch the original message
-            try:
-                message = await self.channel.fetch_message(self.question_message_id)
-            except discord.NotFound:
-                await interaction.followup.send(
-                    "❌ Could not find the question message. It may have been deleted.",
-                    ephemeral=True,
-                )
-                return
-
-            # Get the image URL and process it
-            original_url = self.image_url.value.strip()
-            processed_url = process_image_url(original_url)
-
-            # Get the existing embed and add the image
-            if message.embeds:
-                embed = message.embeds[0]
-                
-                try:
-                    embed.set_image(url=processed_url)
-                    
-                    # Update the message with the new embed
-                    await message.edit(embed=embed)
-                    
-                    await interaction.followup.send(
-                        "✅ Image added to the question!",
-                        ephemeral=True,
-                    )
-                    
-                    if processed_url != original_url:
-                        print(f"Converted image URL: {original_url} -> {processed_url}")
-                        
-                except Exception as e:
-                    print(f"Error setting image: {e}")
-                    await interaction.followup.send(
-                        f"❌ Could not add image. Make sure the URL is a direct link to an image file.\n\n"
-                        f"Tip: Right-click the image and select 'Copy Image Address'",
-                        ephemeral=True,
-                    )
-            else:
-                await interaction.followup.send(
-                    "❌ Could not find the question embed.",
-                    ephemeral=True,
-                )
-
-        except Exception as e:
-            print(f"Error in add image modal: {e}")
-            await interaction.followup.send(
-                "❌ Something went wrong while adding the image.",
-                ephemeral=True,
-            )
-
-
-class AddImageButton(ui.View):
-    """Ephemeral view with button to add an image to the question."""
-
-    def __init__(self, question_message_id: int, channel: discord.TextChannel):
-        super().__init__(timeout=300)  # 5 minute timeout
-        self.question_message_id = question_message_id
-        self.channel = channel
-
-    @ui.button(
-        label="Add Image to Question",
-        style=discord.ButtonStyle.secondary,
-        emoji="🖼️",
-    )
-    async def add_image_button(
-        self, interaction: discord.Interaction, button: ui.Button
-    ) -> None:
-        """Handle the add image button click."""
-        try:
-            # Open modal for image URL
-            modal = AddImageModal(
-                question_message_id=self.question_message_id,
-                channel=self.channel
-            )
-            await interaction.response.send_modal(modal)
-
-        except Exception as e:
-            print(f"Error in add image button: {e}")
             if not interaction.response.is_done():
                 await interaction.response.send_message(
                     "❌ Something went wrong, please try again",
