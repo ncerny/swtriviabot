@@ -225,14 +225,18 @@ async def on_message(message: discord.Message) -> None:
         
         # Process the image URL (handle Tenor, Giphy, etc.)
         processed_url = await process_image_url(image_url)
+        print(f"📎 Processed URL: {processed_url[:100]}...")
         
         # Update the embed with the image
         if question_message.embeds:
             embed = question_message.embeds[0]
+            print(f"📋 Original embed has image: {embed.image.url if embed.image else 'None'}")
             embed.set_image(url=processed_url)
+            print(f"📋 After set_image, embed.image.url: {embed.image.url[:100] if embed.image else 'None'}...")
             
             # Edit the message with the updated embed
             await question_message.edit(embed=embed)
+            print(f"✏️  Edited question message with new embed")
             
             # Delete the follow-up image message
             try:
