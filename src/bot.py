@@ -264,23 +264,19 @@ async def on_message(message: discord.Message) -> None:
                 # Edit the question with the new embed
                 await question_message.edit(embed=new_embed)
                 print(f"✏️  Attached image to question embed")
-            
-            # Delete the follow-up image message
-            try:
-                await message.delete()
-                print(f"✅ Auto-attached image to question {pending.message_id} and deleted follow-up message")
-            except discord.Forbidden:
-                print(f"⚠️  Could not delete follow-up message (missing 'Manage Messages' permission)")
-                print(f"💡 Image was attached successfully! Grant 'Manage Messages' permission to auto-delete follow-up posts.")
-            except Exception as e:
-                print(f"⚠️  Could not delete follow-up message: {e}")
-            
-            # Remove from tracker
-            image_tracker.remove_pending(message.guild.id, message.author.id)
-            
-        else:
-            print(f"⚠️  Question message {pending.message_id} has no embeds")
-            image_tracker.remove_pending(message.guild.id, message.author.id)
+        
+        # Delete the follow-up image message (for both embed and non-embed cases)
+        try:
+            await message.delete()
+            print(f"✅ Auto-attached image to question {pending.message_id} and deleted follow-up message")
+        except discord.Forbidden:
+            print(f"⚠️  Could not delete follow-up message (missing 'Manage Messages' permission)")
+            print(f"💡 Image was attached successfully! Grant 'Manage Messages' permission to auto-delete follow-up posts.")
+        except Exception as e:
+            print(f"⚠️  Could not delete follow-up message: {e}")
+        
+        # Remove from tracker
+        image_tracker.remove_pending(message.guild.id, message.author.id)
             
     except discord.NotFound:
         print(f"⚠️  Could not find question message {pending.message_id}")
