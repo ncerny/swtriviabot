@@ -170,16 +170,19 @@ Example response:
 The bot supports adding images or GIFs to trivia questions. Here's what works:
 
 **✅ Recommended Method - Discord CDN:**
+
 1. Send your GIF in any Discord channel
 2. Right-click the GIF → "Copy Image Address"
 3. Paste that URL in the bot (format: `cdn.discordapp.com/...`)
 4. ✅ This always works and is the most reliable method!
 
 **✅ Also Works:**
+
 - Giphy URLs (automatically converted to direct links)
 - Direct image URLs (ending in `.gif`, `.png`, `.jpg`, etc.)
 
 **❌ Tenor URLs - Currently Not Supported:**
+
 - Tenor URLs (`tenor.com/view/...`) require Google Tenor API
 - **Google has made this API very difficult to enable** (known issue)
 - Even with billing enabled, many users get permission errors
@@ -201,13 +204,13 @@ The bot supports adding images or GIFs to trivia questions. Here's what works:
    - This is a known Google Cloud issue
    - The API exists but the enablement mechanism is broken
    - No known workaround exists currently
-   
 4. If it works (rare), add to `.env`:
    ```
    TENOR_API_KEY=your_api_key_here
    ```
 
 **Why this happens:**
+
 - Tenor API exists (`tenor.googleapis.com`) but doesn't appear in API Library
 - Direct enablement URLs result in "Failed to load" errors
 - REST API enablement returns error code 110002 (billing/quota issue)
