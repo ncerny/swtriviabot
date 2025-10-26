@@ -2,14 +2,12 @@
 
 [![PR Tests](https://github.com/ncerny/swtriviabot/actions/workflows/pr-tests.yml/badge.svg)](https://github.com/ncerny/swtriviabot/actions/workflows/pr-tests.yml)
 [![Release](https://github.com/ncerny/swtriviabot/actions/workflows/release.yml/badge.svg)](https://github.com/ncerny/swtriviabot/actions/workflows/release.yml)
-[![Build Artifact](https://github.com/ncerny/swtriviabot/actions/workflows/artifact.yml/badge.svg)](https://github.com/ncerny/swtriviabot/actions/workflows/artifact.yml)
 [![Latest Release](https://img.shields.io/github/v/release/ncerny/swtriviabot)](https://github.com/ncerny/swtriviabot/releases/latest)
 
 A Discord bot for managing trivia game answers with slash commands. Players submit answers, admins view and reset sessions.
 
 ## Features
 
-- **Submit Answers**: Users submit answers via `/answer` command with duplicate detection
 - **View Submissions**: Admins list all answers with `/list-answers` command
 - **Reset Sessions**: Admins clear all answers with `/reset-answers` command
 - **Multi-Server Support**: Isolated session state per Discord server
@@ -271,6 +269,7 @@ We use [Conventional Commits](https://www.conventionalcommits.org/) for automati
 ```
 
 **Types:**
+
 - `feat`: New feature (minor version bump)
 - `fix`: Bug fix (patch version bump)
 - `docs`: Documentation only
@@ -280,10 +279,12 @@ We use [Conventional Commits](https://www.conventionalcommits.org/) for automati
 - `chore`: Maintenance tasks
 
 **Breaking Changes:**
+
 - Add `!` after type: `feat!: redesign command interface`
 - Or include `BREAKING CHANGE:` in footer (major version bump)
 
 **Examples:**
+
 ```bash
 git commit -m "feat: add /leaderboard command"
 git commit -m "fix: prevent duplicate submissions in same second"
@@ -296,6 +297,7 @@ BREAKING CHANGE: Answer format changed from string to object"
 ### Release Process
 
 Releases are automated via GitHub Actions:
+
 1. PRs are tested automatically (PR Tests workflow)
 2. Merging to `main` triggers semantic-release (Release workflow)
 3. Version is calculated from conventional commits
@@ -432,12 +434,14 @@ To ensure code quality and automated releases work correctly, configure the foll
 4. **Save changes**
 
 **Why this matters:**
+
 - Prevents untested code from reaching main
 - Ensures all PRs have passing tests before merge
 - Triggers automatic releases only for tested code
 - Enforces conventional commit messages through PR review
 
 **Workflow Monitoring:**
+
 - PR Tests workflow must pass (≥80% coverage)
 - Release workflow runs automatically on merge to main
 - Artifact workflow attaches deployment-ready files to release
