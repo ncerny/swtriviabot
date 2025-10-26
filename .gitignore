@@ -6,9 +6,10 @@
 data/
 *.json
 
-# Allow npm package files
+# Allow npm and semantic-release config files
 !package.json
 !package-lock.json
+!.releaserc.json
 
 # Python
 __pycache__/
