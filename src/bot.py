@@ -224,7 +224,7 @@ async def on_message(message: discord.Message) -> None:
         question_message = await channel.fetch_message(pending.message_id)
         
         # Check if the user's message has embeds (like Discord GIF picker creates)
-        # Instead of trying to modify embeds, edit the user's message to add question text  
+        # We can't edit user's message, so add their embed to the bot's question message
         if message.embeds:
             user_embed = message.embeds[0]
             print(f"📎 User message has embed with video: {user_embed.video.url if user_embed.video else 'None'}")
@@ -234,21 +234,21 @@ async def on_message(message: discord.Message) -> None:
                 question_embed = question_message.embeds[0]
                 print(f"✅ Both messages have embeds, proceeding with merge")
                 
-                # Edit the user's message to include the question text as content
-                # Keep their embed untouched (preserves video field)
-                question_text = question_embed.description
+                # Edit the bot's question message to include both embeds
+                # The question embed first, then the user's GIF embed
+                await question_message.edit(embeds=[question_embed, user_embed])
+                print(f"✏️  Added GIF embed to question message")
                 
-                await message.edit(content=question_text, embed=user_embed)
-                print(f"✏️  Added question text to user's message")
-                
-                # Now delete the original question message since we've merged into user's message
+                # Delete the user's follow-up message
                 try:
-                    await question_message.delete()
-                    print(f"🗑️  Deleted original question message")
+                    await message.delete()
+                    print(f"🗑️  Deleted user's follow-up message")
+                except discord.Forbidden:
+                    print(f"⚠️  Could not delete follow-up (missing Manage Messages permission)")
                 except Exception as e:
-                    print(f"⚠️  Could not delete original question: {e}")
+                    print(f"⚠️  Could not delete follow-up: {e}")
                 
-                # Remove from tracker - DO NOT delete user's message
+                # Remove from tracker
                 image_tracker.remove_pending(message.guild.id, message.author.id)
                 return
             else:
