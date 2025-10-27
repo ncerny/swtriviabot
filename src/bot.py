@@ -224,35 +224,28 @@ async def on_message(message: discord.Message) -> None:
         question_message = await channel.fetch_message(pending.message_id)
         
         # Check if the user's message has embeds (like Discord GIF picker creates)
-        # We can't edit user's message, so add their embed to the bot's question message
+        # Add their embed to the bot's question message (question is in content, not embed)
         if message.embeds:
             user_embed = message.embeds[0]
             print(f"📎 User message has embed with video: {user_embed.video.url if user_embed.video else 'None'}")
-            print(f"📋 Question message has {len(question_message.embeds)} embeds")
             
-            if question_message.embeds:
-                question_embed = question_message.embeds[0]
-                print(f"✅ Both messages have embeds, proceeding with merge")
-                
-                # Edit the bot's question message to include both embeds
-                # The question embed first, then the user's GIF embed
-                await question_message.edit(embeds=[question_embed, user_embed])
-                print(f"✏️  Added GIF embed to question message")
-                
-                # Delete the user's follow-up message
-                try:
-                    await message.delete()
-                    print(f"🗑️  Deleted user's follow-up message")
-                except discord.Forbidden:
-                    print(f"⚠️  Could not delete follow-up (missing Manage Messages permission)")
-                except Exception as e:
-                    print(f"⚠️  Could not delete follow-up: {e}")
-                
-                # Remove from tracker
-                image_tracker.remove_pending(message.guild.id, message.author.id)
-                return
-            else:
-                print(f"⚠️  Question message has no embeds, cannot merge")
+            # Add the user's GIF embed to the question message
+            # Question text is already in message content, just add the embed
+            await question_message.edit(embed=user_embed)
+            print(f"✏️  Added GIF embed to question message")
+            
+            # Delete the user's follow-up message
+            try:
+                await message.delete()
+                print(f"🗑️  Deleted user's follow-up message")
+            except discord.Forbidden:
+                print(f"⚠️  Could not delete follow-up (missing Manage Messages permission)")
+            except Exception as e:
+                print(f"⚠️  Could not delete follow-up: {e}")
+            
+            # Remove from tracker
+            image_tracker.remove_pending(message.guild.id, message.author.id)
+            return
         
         # If no embed in user message, handle static images normally
         processed_url = await process_image_url(image_url)

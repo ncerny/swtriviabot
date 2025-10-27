@@ -122,6 +122,13 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
                     f"_Total answers: {len(previous_session.answers)}_"
                 )
 
+                # Send previous answers to admin if they existed
+                if previous_answers_message:
+                    await self.channel.send(
+                        previous_answers_message,
+                        ephemeral=True,
+                    )
+
             # Reset session and create new one
             answer_service.reset_session(self.guild_id)
             session = answer_service.create_session(self.guild_id)
@@ -143,25 +150,19 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
 
             # Add today's question
             message_parts.append(f"**Today's Question...**\n{self.todays_question.value.strip()}")
+            
+            # Add instruction to submit answer
+            message_parts.append(f"Please click the button below to submit your answer!")
 
             # Combine all parts
             message_content = "\n\n".join(message_parts)
 
-            # Create embed for the question
-            embed = discord.Embed(
-                description=message_content,
-                color=discord.Color.blue()
-            )
-
-            # Always set footer
-            embed.set_footer(text="Please click the button below to submit your answer!")
-
             # Create persistent button view
             view = AnswerButton()
             
-            # Post question in the channel
+            # Post question in the channel as content (not embed)
             question_message = await self.channel.send(
-                embed=embed,
+                content=message_content,
                 view=view,
             )
 
@@ -180,11 +181,6 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
             if previous_answers_message:
                 await interaction.followup.send(
                     previous_answers_message,
-                    ephemeral=True,
-                )
-            else:
-                await interaction.followup.send(
-                    "✅ Question posted!\n\n_No previous answers to display._",
                     ephemeral=True,
                 )
 
