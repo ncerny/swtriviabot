@@ -228,9 +228,11 @@ async def on_message(message: discord.Message) -> None:
         if message.embeds:
             user_embed = message.embeds[0]
             print(f"📎 User message has embed with video: {user_embed.video.url if user_embed.video else 'None'}")
+            print(f"📋 Question message has {len(question_message.embeds)} embeds")
             
             if question_message.embeds:
                 question_embed = question_message.embeds[0]
+                print(f"✅ Both messages have embeds, proceeding with merge")
                 
                 # Edit the user's message to include the question text as content
                 # Keep their embed untouched (preserves video field)
@@ -249,6 +251,8 @@ async def on_message(message: discord.Message) -> None:
                 # Remove from tracker - DO NOT delete user's message
                 image_tracker.remove_pending(message.guild.id, message.author.id)
                 return
+            else:
+                print(f"⚠️  Question message has no embeds, cannot merge")
         
         # If no embed in user message, handle static images normally
         processed_url = await process_image_url(image_url)
