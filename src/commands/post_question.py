@@ -133,7 +133,7 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
                 image_url = self.image_url.value.strip()
                 message_parts.append(image_url)
             
-            # Add instruction to submit answer
+            # Add instruction to submit answer (after image so it appears below the embedded image)
             message_parts.append(f"Please click the button below to submit your answer!")
 
             # Combine all parts
