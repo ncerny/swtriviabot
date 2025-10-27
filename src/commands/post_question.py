@@ -144,38 +144,46 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
             # Add today's question
             message_parts.append(f"**Today's Question...**\n{self.todays_question.value.strip()}")
 
+            # Add instruction to submit answer
+            message_parts.append(f"Please click the button below to submit your answer!")
+
             # Combine all parts
             message_content = "\n\n".join(message_parts)
 
             # Create embed for the question
-            embed = discord.Embed(
-                description=message_content,
-                color=discord.Color.blue()
-            )
+            # embed = discord.Embed(
+            #     description=message_content,
+            #     color=discord.Color.blue()
+            # )
 
-            # Add image if URL provided
-            if self.image_url.value and self.image_url.value.strip():
-                original_url = self.image_url.value.strip()
-                processed_url = await process_image_url(original_url)
+            # # Add image if URL provided
+            # if self.image_url.value and self.image_url.value.strip():
+            #     original_url = self.image_url.value.strip()
+            #     processed_url = await process_image_url(original_url)
                 
-                try:
-                    embed.set_image(url=processed_url)
-                    # If URL was converted, log it
-                    if processed_url != original_url:
-                        print(f"Converted image URL: {original_url} -> {processed_url}")
-                except Exception as e:
-                    # If the image URL is invalid, log it but continue posting the question
-                    print(f"Warning: Could not set image with URL '{processed_url}': {e}")
+            #     try:
+            #         embed.set_image(url=processed_url)
+            #         # If URL was converted, log it
+            #         if processed_url != original_url:
+            #             print(f"Converted image URL: {original_url} -> {processed_url}")
+            #     except Exception as e:
+            #         # If the image URL is invalid, log it but continue posting the question
+            #         print(f"Warning: Could not set image with URL '{processed_url}': {e}")
 
-            # Always set footer
-            embed.set_footer(text="Please click the button below to submit your answer!")
+            # # Always set footer
+            # embed.set_footer(text="Please click the button below to submit your answer!")
 
             # Create persistent button view
             view = AnswerButton()
 
+            # placeholder_embed = discord.Embed(
+                
+            #     color=discord.Color.blue()
+            
             # Post question in the channel
             question_message = await self.channel.send(
-                embed=embed,
+                content=message_content,
+                embeds=[],
                 view=view,
             )
 

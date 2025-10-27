@@ -224,31 +224,33 @@ async def on_message(message: discord.Message) -> None:
         question_message = await channel.fetch_message(pending.message_id)
         
         # Check if the user's message has embeds (like Discord GIF picker creates)
-        # If so, we can copy that embed and add the question text to it
+        # Instead of trying to modify embeds, edit the user's message to add question text  
         if message.embeds:
-            # Use the embed from the user's message directly
-            # This preserves the video field that Discord created
-            image_embed = message.embeds[0].copy()
-            print(f"📎 Found embed in user message with video: {image_embed.video.url if image_embed.video else 'None'}")
+            user_embed = message.embeds[0]
+            print(f"📎 User message has embed with video: {user_embed.video.url if user_embed.video else 'None'}")
             
-            # Get the existing question embed and add its text to the image embed
             if question_message.embeds:
                 question_embed = question_message.embeds[0]
                 
-                # Copy the question text into the image embed's description
-                # This combines the question with the GIF in a single embed
-                image_embed.description = question_embed.description
-                image_embed.color = question_embed.color
+                # Edit the user's message to include the question text as content
+                # Keep their embed untouched (preserves video field)
+                question_text = question_embed.description
                 
-                # Copy footer if it exists
-                if question_embed.footer:
-                    image_embed.set_footer(text=question_embed.footer.text, icon_url=question_embed.footer.icon_url)
+                await message.edit(content=question_text, embed=user_embed)
+                print(f"✏️  Added question text to user's message")
                 
-                # Replace the question embed with the merged embed
-                await question_message.edit(embed=image_embed)
-                print(f"✏️  Merged question text into image embed")
-        else:
-            # No embed in user message, try to create one with the image URL
+                # Now delete the original question message since we've merged into user's message
+                try:
+                    await question_message.delete()
+                    print(f"🗑️  Deleted original question message")
+                except Exception as e:
+                    print(f"⚠️  Could not delete original question: {e}")
+                
+                # Remove from tracker
+                image_tracker.remove_pending(message.guild.id, message.author.id)
+                return
+        
+        # If no embed in user message, handle static images normally
             processed_url = await process_image_url(image_url)
             print(f"📎 Processed URL: {processed_url[:100]}...")
             
