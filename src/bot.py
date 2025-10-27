@@ -246,36 +246,36 @@ async def on_message(message: discord.Message) -> None:
                 except Exception as e:
                     print(f"⚠️  Could not delete original question: {e}")
                 
-                # Remove from tracker
+                # Remove from tracker - DO NOT delete user's message
                 image_tracker.remove_pending(message.guild.id, message.author.id)
                 return
         
         # If no embed in user message, handle static images normally
-            processed_url = await process_image_url(image_url)
-            print(f"📎 Processed URL: {processed_url[:100]}...")
-            
-            # For static images, we can attach them to the embed
-            if question_message.embeds:
-                old_embed = question_message.embeds[0]
-                
-                # Create new embed with the image
-                new_embed = discord.Embed(
-                    description=old_embed.description,
-                    color=old_embed.color,
-                    title=old_embed.title,
-                    url=old_embed.url
-                )
-                new_embed.set_image(url=processed_url)
-                
-                # Copy footer if it exists
-                if old_embed.footer:
-                    new_embed.set_footer(text=old_embed.footer.text, icon_url=old_embed.footer.icon_url)
-                
-                # Edit the question with the new embed
-                await question_message.edit(embed=new_embed)
-                print(f"✏️  Attached image to question embed")
+        processed_url = await process_image_url(image_url)
+        print(f"📎 Processed URL: {processed_url[:100]}...")
         
-        # Delete the follow-up image message (for both embed and non-embed cases)
+        # For static images, we can attach them to the embed
+        if question_message.embeds:
+            old_embed = question_message.embeds[0]
+            
+            # Create new embed with the image
+            new_embed = discord.Embed(
+                description=old_embed.description,
+                color=old_embed.color,
+                title=old_embed.title,
+                url=old_embed.url
+            )
+            new_embed.set_image(url=processed_url)
+            
+            # Copy footer if it exists
+            if old_embed.footer:
+                new_embed.set_footer(text=old_embed.footer.text, icon_url=old_embed.footer.icon_url)
+            
+            # Edit the question with the new embed
+            await question_message.edit(embed=new_embed)
+            print(f"✏️  Attached image to question embed")
+        
+        # Delete the follow-up image message (for static images only, not embeds)
         try:
             await message.delete()
             print(f"✅ Auto-attached image to question {pending.message_id} and deleted follow-up message")
