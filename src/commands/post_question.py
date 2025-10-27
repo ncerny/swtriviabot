@@ -111,40 +111,40 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
             session = answer_service.create_session(self.guild_id)
             storage_service.save_session_to_disk(self.guild_id, session)
 
-            # Build the message content
-            message_parts = []
-
+            # Message 1: Yesterday's results (if any)
+            yesterday_parts = []
+            
             # Add yesterday's answer if provided
             if self.yesterday_answer.value.strip():
-                message_parts.append(f"**Yesterday's Answer...**\n{self.yesterday_answer.value.strip()}")
+                yesterday_parts.append(f"**Yesterday's Answer...**\n{self.yesterday_answer.value.strip()}")
 
             # Add yesterday's winners if provided
             if self.yesterday_winners.value.strip() and self.yesterday_winners.value.strip() != "" and self.yesterday_winners.value.strip().lower() != "no winners":
-                message_parts.append(f"Congrats to {self.yesterday_winners.value.strip()} your gold has been mailed. Thanks for playing!")
+                yesterday_parts.append(f"Congrats to {self.yesterday_winners.value.strip()} your gold has been mailed. Thanks for playing!")
             else:
-                message_parts.append(f"Unfortunately we had no winners, better luck next time!")
+                yesterday_parts.append(f"Unfortunately we had no winners, better luck next time!")
 
+            # Send yesterday's message if there's content
+            if yesterday_parts:
+                yesterday_content = "\n\n".join(yesterday_parts)
+                await self.channel.send(content=yesterday_content)
 
-            # Add today's question
-            message_parts.append(f"**Today's Question...**\n{self.todays_question.value.strip()}")
+            # Message 2: Today's question + image
+            question_parts = []
+            question_parts.append(f"**Today's Question...**\n{self.todays_question.value.strip()}")
             
             # Add image URL if provided
             if self.image_url.value and self.image_url.value.strip():
                 image_url = self.image_url.value.strip()
-                message_parts.append(image_url)
+                question_parts.append(image_url)
             
-            # Add instruction to submit answer (after image so it appears below the embedded image)
-            message_parts.append(f"Please click the button below to submit your answer!")
-
-            # Combine all parts
-            message_content = "\n\n".join(message_parts)
-
-            # Create persistent button view
+            question_content = "\n\n".join(question_parts)
+            await self.channel.send(content=question_content)
+            
+            # Message 3: Instruction + button
             view = AnswerButton()
-            
-            # Post question in the channel as content (not embed)
-            question_message = await self.channel.send(
-                content=message_content,
+            await self.channel.send(
+                content="Please click the button below to submit your answer!",
                 view=view,
             )
 
