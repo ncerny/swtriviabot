@@ -355,23 +355,3 @@ async def test_answer_button_persistent_view():
 
 
 @pytest.mark.asyncio
-async def test_process_image_url_direct_link():
-    """Test that image URLs are returned stripped of whitespace."""
-    from src.commands.post_question import process_image_url
-    
-    url = "  https://cdn.example.com/image.gif  "
-    result = await process_image_url(url)
-    assert result == "https://cdn.example.com/image.gif"
-
-
-@pytest.mark.asyncio
-async def test_process_image_url_empty():
-    """Test that empty URLs are returned as-is."""
-    from src.commands.post_question import process_image_url
-    
-    result = await process_image_url("")
-    assert result == ""
-    
-    result = await process_image_url(None)
-    assert result is None
-

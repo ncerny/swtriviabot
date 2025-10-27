@@ -4,30 +4,7 @@ import discord
 from discord import app_commands, ui
 
 from src.services import answer_service, storage_service
-from src.services.image_tracker import get_image_tracker
 
-
-async def process_image_url(url: str) -> str:
-    """Process image URL to ensure it's a direct link to the image.
-    
-    Handles special cases like Tenor video URLs.
-    
-    Args:
-        url: The image URL provided by the user
-        
-    Returns:
-        The processed URL that Discord can display as an image
-    """
-    if not url or not url.strip():
-        return url
-    
-    url = url.strip()
-    
-    # Don't convert Tenor URLs - Discord handles .mp4 from Tenor directly
-    # The conversion to .gif doesn't seem to work properly
-    print(f"� Using URL as-is: {url[:100]}...")
-    
-    return url
 
 
 class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
@@ -59,7 +36,7 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
 
     image_url = ui.TextInput(
         label="Image URL (optional)",
-        placeholder="Direct URL to image, or leave blank to post image next",
+        placeholder="Direct URL to image",
         required=False,
         max_length=500,
         style=discord.TextStyle.short,
@@ -151,6 +128,11 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
             # Add today's question
             message_parts.append(f"**Today's Question...**\n{self.todays_question.value.strip()}")
             
+            # Add image URL if provided
+            if self.image_url.value and self.image_url.value.strip():
+                image_url = self.image_url.value.strip()
+                message_parts.append(image_url)
+            
             # Add instruction to submit answer
             message_parts.append(f"Please click the button below to submit your answer!")
 
@@ -165,17 +147,6 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
                 content=message_content,
                 view=view,
             )
-
-            # If no image was provided, track this question for potential image attachment
-            if not (self.image_url.value and self.image_url.value.strip()):
-                image_tracker = get_image_tracker()
-                image_tracker.add_pending(
-                    user_id=interaction.user.id,
-                    channel_id=self.channel.id,
-                    message_id=question_message.id,
-                    guild_id=self.guild_id
-                )
-                print(f"📸 Tracking question {question_message.id} for image upload from user {interaction.user.id} in guild {self.guild_id}")
 
             # Send previous answers to admin if they existed
             if previous_answers_message:
