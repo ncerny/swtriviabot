@@ -82,6 +82,12 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
             if previous_session:
                 print(f"Debug: previous_session.answers = {previous_session.answers}")
                 print(f"Debug: len(answers) = {len(previous_session.answers) if previous_session.answers else 0}")
+            
+            # Also check what's on disk
+            from src.services import storage_service
+            disk_session = storage_service.load_session_from_disk(str(self.guild_id))
+            print(f"Debug: disk_session.answers = {disk_session.answers if disk_session else 'No file on disk'}")
+            print(f"Debug: len(disk answers) = {len(disk_session.answers) if disk_session else 0}")
 
             if previous_session and previous_session.answers:
                 # Format previous answers
