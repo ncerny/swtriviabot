@@ -99,12 +99,17 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
                     f"_Total answers: {len(previous_session.answers)}_"
                 )
 
-                # Send previous answers to admin if they existed
-                if previous_answers_message:
-                    await self.channel.send(
-                        previous_answers_message,
-                        ephemeral=True,
-                    )
+            # Send previous answers to admin FIRST (before resetting)
+            if previous_answers_message:
+                await interaction.followup.send(
+                    previous_answers_message,
+                    ephemeral=True,
+                )
+            else:
+                await interaction.followup.send(
+                    "✅ Question posted!\n\n_No previous answers to display._",
+                    ephemeral=True,
+                )
 
             # Reset session and create new one
             answer_service.reset_session(self.guild_id)
@@ -147,13 +152,6 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
                 content="Please click the button below to submit your answer!",
                 view=view,
             )
-
-            # Send previous answers to admin if they existed
-            if previous_answers_message:
-                await interaction.followup.send(
-                    previous_answers_message,
-                    ephemeral=True,
-                )
 
         except ValueError as e:
             await interaction.followup.send(f"❌ {str(e)}", ephemeral=True)
