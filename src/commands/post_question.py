@@ -77,6 +77,11 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
             # Get previous answers before resetting
             previous_session = answer_service.get_session(self.guild_id)
             previous_answers_message = None
+            
+            print(f"Debug: previous_session = {previous_session}")
+            if previous_session:
+                print(f"Debug: previous_session.answers = {previous_session.answers}")
+                print(f"Debug: len(answers) = {len(previous_session.answers) if previous_session.answers else 0}")
 
             if previous_session and previous_session.answers:
                 # Format previous answers
@@ -98,6 +103,7 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
                     f"{answers_text}\n"
                     f"_Total answers: {len(previous_session.answers)}_"
                 )
+                print(f"Debug: Created previous_answers_message with {len(previous_session.answers)} answers")
 
             # Send previous answers to admin FIRST (before resetting)
             if previous_answers_message:
