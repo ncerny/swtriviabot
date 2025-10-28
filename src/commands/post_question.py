@@ -44,7 +44,7 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
 
     def __init__(self, guild_id: int, channel: discord.TextChannel):
         super().__init__()
-        self.guild_id = guild_id
+        self.guild_id = str(guild_id)  # Convert to string for consistency with answer_service
         self.channel = channel
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
@@ -77,17 +77,6 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
             # Get previous answers before resetting
             previous_session = answer_service.get_session(self.guild_id)
             previous_answers_message = None
-            
-            print(f"Debug: previous_session = {previous_session}")
-            if previous_session:
-                print(f"Debug: previous_session.answers = {previous_session.answers}")
-                print(f"Debug: len(answers) = {len(previous_session.answers) if previous_session.answers else 0}")
-            
-            # Also check what's on disk
-            from src.services import storage_service
-            disk_session = storage_service.load_session_from_disk(str(self.guild_id))
-            print(f"Debug: disk_session.answers = {disk_session.answers if disk_session else 'No file on disk'}")
-            print(f"Debug: len(disk answers) = {len(disk_session.answers) if disk_session else 0}")
 
             if previous_session and previous_session.answers:
                 # Format previous answers
@@ -109,7 +98,6 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
                     f"{answers_text}\n"
                     f"_Total answers: {len(previous_session.answers)}_"
                 )
-                print(f"Debug: Created previous_answers_message with {len(previous_session.answers)} answers")
 
             # Send previous answers to admin FIRST (before resetting)
             if previous_answers_message:
@@ -124,13 +112,9 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
                 )
 
             # Reset session and create new one
-            print(f"Debug: Resetting session for guild {self.guild_id}")
             answer_service.reset_session(self.guild_id)
-            print(f"Debug: Creating new empty session")
             session = answer_service.create_session(self.guild_id)
-            print(f"Debug: Saving new empty session to disk")
             storage_service.save_session_to_disk(self.guild_id, session)
-            print(f"Debug: New session saved, answers = {session.answers}")
 
             # Message 1: Yesterday's results (if any)
             yesterday_parts = []
@@ -212,11 +196,8 @@ class AnswerModal(ui.Modal, title="Submit Your Trivia Answer"):
 
             # Save session to disk
             session = answer_service.get_session(self.guild_id)
-            print(f"Debug: After submit_answer, session.answers = {session.answers if session else 'None'}")
             if session:
-                print(f"Debug: Saving session with {len(session.answers)} answers to disk")
                 storage_service.save_session_to_disk(self.guild_id, session)
-                print(f"Debug: Session saved to disk")
 
             # Send appropriate response via followup
             if is_update:
