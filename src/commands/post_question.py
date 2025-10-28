@@ -118,9 +118,13 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
                 )
 
             # Reset session and create new one
+            print(f"Debug: Resetting session for guild {self.guild_id}")
             answer_service.reset_session(self.guild_id)
+            print(f"Debug: Creating new empty session")
             session = answer_service.create_session(self.guild_id)
+            print(f"Debug: Saving new empty session to disk")
             storage_service.save_session_to_disk(self.guild_id, session)
+            print(f"Debug: New session saved, answers = {session.answers}")
 
             # Message 1: Yesterday's results (if any)
             yesterday_parts = []
@@ -202,8 +206,11 @@ class AnswerModal(ui.Modal, title="Submit Your Trivia Answer"):
 
             # Save session to disk
             session = answer_service.get_session(self.guild_id)
+            print(f"Debug: After submit_answer, session.answers = {session.answers if session else 'None'}")
             if session:
+                print(f"Debug: Saving session with {len(session.answers)} answers to disk")
                 storage_service.save_session_to_disk(self.guild_id, session)
+                print(f"Debug: Session saved to disk")
 
             # Send appropriate response via followup
             if is_update:
