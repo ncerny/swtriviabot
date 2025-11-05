@@ -44,20 +44,23 @@ class TestImageHidingIntegration:
     @pytest.mark.asyncio
     async def test_post_question_with_invalid_image(self, mock_interaction, mock_channel):
         """Test posting question with invalid image URL."""
-        # Create modal with invalid image URL
+    # Create modal
         modal = PostQuestionModal(guild_id=123456789, channel=mock_channel)
+        # Mock the text input fields
+        modal.yesterday_answer = MagicMock()
         modal.yesterday_answer.value = ""
+        modal.yesterday_winners = MagicMock()
         modal.yesterday_winners.value = ""
+        modal.todays_question = MagicMock()
         modal.todays_question.value = "What is the capital of France?"
-        modal.image_url.value = "https://example.com/invalid-image.jpg"
 
-        # Mock failed image validation with the actual error that would be returned
-        error_message = "❌ **Image Error**: This appears to be a webpage link, not a direct image. Right-click on the image and select 'Copy image address' or 'Copy image URL' to get the direct link."
-        with patch('src.services.image_service.validate_image_url') as mock_validate:
-            mock_validate.return_value = (False, error_message)
+    # Mock failed image validation with the actual error that would be returned
+    error_message = "❌ **Image Error**: This appears to be a webpage link, not a direct image. Right-click on the image and select 'Copy image address' or 'Copy image URL' to get the direct link."
+    with patch('src.services.image_service.validate_image_url') as mock_validate:
+        mock_validate.return_value = (False, error_message)
 
-            # Mock other services
-            with patch('src.services.answer_service.get_session', return_value=None), \
+        # Mock other services
+        with patch('src.services.answer_service.get_session', return_value=None), \
                  patch('src.services.answer_service.reset_session'), \
                  patch('src.services.answer_service.create_session'), \
                  patch('src.services.storage_service.save_session_to_disk'), \
@@ -86,12 +89,15 @@ class TestImageHidingIntegration:
     @pytest.mark.asyncio
     async def test_post_question_without_image(self, mock_interaction, mock_channel):
         """Test posting question without image URL."""
-        # Create modal without image URL
+    # Create modal
         modal = PostQuestionModal(guild_id=123456789, channel=mock_channel)
+        # Mock the text input fields
+        modal.yesterday_answer = MagicMock()
         modal.yesterday_answer.value = ""
-        modal.yesterday_winners.value = ""
-        modal.todays_question.value = "What is the capital of France?"
-        modal.image_url.value = ""
+        modal.yesterday_winners = MagicMock()
+            modal.yesterday_winners.value = ""
+            modal.todays_question = MagicMock()
+            modal.todays_question.value = "What is the capital of France?"
 
         # Mock services
         with patch('src.services.answer_service.get_session', return_value=None), \
@@ -108,8 +114,8 @@ class TestImageHidingIntegration:
 
             # Verify no image validation was called
             with patch('src.services.image_service.validate_image_url') as mock_validate:
-                # Should not be called since no image input
-                assert not mock_validate.called
+            # Should not be called since no image input
+            assert not mock_validate.called
 
     @pytest.mark.asyncio
     async def test_post_question_with_follow_up_image(self, mock_interaction, mock_channel):
