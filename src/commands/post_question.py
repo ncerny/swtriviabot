@@ -165,6 +165,15 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
                             except:
                                 pass
                             return result
+                        elif not success and isinstance(result, str):
+                            # Send error message to channel
+                            await self.channel.send(f"⚠️ **Image Error**: {result}")
+                            # Delete the user's message
+                            try:
+                                await message.delete()
+                            except:
+                                pass
+                            return None
 
         except asyncio.TimeoutError:
             # No image message received within timeout
