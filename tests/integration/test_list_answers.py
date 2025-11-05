@@ -112,3 +112,6 @@ async def test_list_answers_handles_unexpected_errors(mock_interaction, tmp_path
     call_args = mock_interaction.followup.send.call_args
     assert "Something went wrong" in call_args[0][0]
     assert call_args[1]["ephemeral"] is True
+
+
+

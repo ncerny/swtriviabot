@@ -157,3 +157,5 @@ def test_session_json_format(tmp_path):
     assert "created_at" in data
     assert "last_activity" in data
     assert data["guild_id"] == guild_id
+
+

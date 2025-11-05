@@ -2,9 +2,11 @@
 Unit tests for image_service.py
 """
 import asyncio
+import os
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from discord import Embed
+import aiohttp
 
 from src.services.image_service import ImageService, validate_image_url
 from src.models.image import Image
@@ -233,3 +235,221 @@ class TestImageModel:
         assert service._is_url("") is False
         assert service._is_url("   ") is False
         assert service._is_url("not-a-url") is False
+
+    @pytest.mark.asyncio
+    async def test_search_tenor_gifs_success(self):
+        """Test successful Tenor GIF search."""
+        service = ImageService()
+        service.tenor_api_key = "test-key"
+        
+        mock_response_data = {
+            "results": [
+                {
+                    "media_formats": {
+                        "gif": {"url": "https://media.tenor.com/gif1.gif"},
+                        "tinygif": {"url": "https://media.tenor.com/tiny1.gif"}
+                    }
+                },
+                {
+                    "media_formats": {
+                        "gif": {"url": "https://media.tenor.com/gif2.gif"}
+                    }
+                }
+            ]
+        }
+
+        async with aiohttp.ClientSession() as session:
+            service.session = session
+            with patch.object(session, 'get') as mock_get:
+                mock_response = AsyncMock()
+                mock_response.status = 200
+                mock_response.json = AsyncMock(return_value=mock_response_data)
+                mock_response_cm = AsyncMock()
+                mock_response_cm.__aenter__ = AsyncMock(return_value=mock_response)
+                mock_response_cm.__aexit__ = AsyncMock(return_value=None)
+                mock_get.return_value = mock_response_cm
+
+                results = await service._search_tenor_gifs("dancing cat")
+
+                assert len(results) == 2
+                assert results[0]['url'] == "https://media.tenor.com/gif1.gif"
+                assert results[0]['preview_url'] == "https://media.tenor.com/tiny1.gif"
+                assert results[1]['url'] == "https://media.tenor.com/gif2.gif"
+
+    @pytest.mark.asyncio
+    async def test_search_tenor_gifs_no_api_key(self):
+        """Test Tenor search without API key."""
+        service = ImageService()
+        service.tenor_api_key = None
+        
+        async with aiohttp.ClientSession() as session:
+            service.session = session
+            results = await service._search_tenor_gifs("test")
+            assert results is None
+
+    @pytest.mark.asyncio
+    async def test_search_tenor_gifs_no_session(self):
+        """Test Tenor search without session."""
+        service = ImageService()
+        service.tenor_api_key = "test-key"
+        service.session = None
+        
+        results = await service._search_tenor_gifs("test")
+        assert results == []
+
+    @pytest.mark.asyncio
+    async def test_search_tenor_gifs_api_error(self):
+        """Test Tenor search with API error."""
+        service = ImageService()
+        service.tenor_api_key = "test-key"
+        
+        async with aiohttp.ClientSession() as session:
+            service.session = session
+            with patch.object(session, 'get') as mock_get:
+                mock_response = AsyncMock()
+                mock_response.status = 500
+                mock_response_cm = AsyncMock()
+                mock_response_cm.__aenter__ = AsyncMock(return_value=mock_response)
+                mock_response_cm.__aexit__ = AsyncMock(return_value=None)
+                mock_get.return_value = mock_response_cm
+
+                results = await service._search_tenor_gifs("test")
+                assert results == []
+
+    @pytest.mark.asyncio
+    async def test_search_tenor_gifs_no_results(self):
+        """Test Tenor search with no results."""
+        service = ImageService()
+        service.tenor_api_key = "test-key"
+        
+        async with aiohttp.ClientSession() as session:
+            service.session = session
+            with patch.object(session, 'get') as mock_get:
+                mock_response = AsyncMock()
+                mock_response.status = 200
+                mock_response.json = AsyncMock(return_value={"results": []})
+                mock_response_cm = AsyncMock()
+                mock_response_cm.__aenter__ = AsyncMock(return_value=mock_response)
+                mock_response_cm.__aexit__ = AsyncMock(return_value=None)
+                mock_get.return_value = mock_response_cm
+
+                results = await service._search_tenor_gifs("nonexistent")
+                assert results == []
+
+    @pytest.mark.asyncio
+    async def test_search_tenor_gifs_timeout(self):
+        """Test Tenor search with timeout."""
+        service = ImageService()
+        service.tenor_api_key = "test-key"
+        
+        async with aiohttp.ClientSession() as session:
+            service.session = session
+            with patch.object(session, 'get') as mock_get:
+                mock_get.side_effect = asyncio.TimeoutError()
+                
+                results = await service._search_tenor_gifs("test")
+                assert results == []
+
+    @pytest.mark.asyncio
+    async def test_search_tenor_gifs_network_error(self):
+        """Test Tenor search with network error."""
+        service = ImageService()
+        service.tenor_api_key = "test-key"
+        
+        async with aiohttp.ClientSession() as session:
+            service.session = session
+            with patch.object(session, 'get') as mock_get:
+                mock_get.side_effect = aiohttp.ClientError("Network error")
+                
+                results = await service._search_tenor_gifs("test")
+                assert results == []
+
+    @pytest.mark.asyncio
+    async def test_process_search_term_success(self):
+        """Test successful search term processing."""
+        service = ImageService()
+        service.tenor_api_key = "test-key"
+        
+        mock_gifs = [
+            {'url': 'https://media.tenor.com/gif1.gif', 'preview_url': 'https://media.tenor.com/tiny1.gif'}
+        ]
+        
+        with patch.object(service, '_search_tenor_gifs', return_value=mock_gifs):
+            success, result = await service._process_search_term("test")
+            
+            assert success is True
+            assert result == mock_gifs
+
+    @pytest.mark.asyncio
+    async def test_process_search_term_no_results(self):
+        """Test search term processing with no results."""
+        service = ImageService()
+        service.tenor_api_key = "test-key"
+        
+        with patch.object(service, '_search_tenor_gifs', return_value=[]):
+            success, result = await service._process_search_term("test")
+            
+            assert success is False
+            assert "No GIFs found for 'test'" in result
+
+    @pytest.mark.asyncio
+    async def test_context_manager(self):
+        """Test ImageService as async context manager."""
+        async with ImageService(timeout=5.0) as service:
+            assert service.session is not None
+            assert isinstance(service.session, aiohttp.ClientSession)
+        
+        # Session should be closed after exiting context
+        assert service.session.closed
+
+    @pytest.mark.asyncio
+    async def test_format_user_friendly_error_general_timeout(self):
+        """Test general error formatting for timeout."""
+        service = ImageService()
+        error = service._format_user_friendly_error("general", "Request timeout")
+        assert "timed out" in error.lower()
+
+    @pytest.mark.asyncio
+    async def test_format_user_friendly_error_general_network(self):
+        """Test general error formatting for network error."""
+        service = ImageService()
+        error = service._format_user_friendly_error("general", "Network connection failed")
+        assert "network error" in error.lower()
+
+    @pytest.mark.asyncio
+    async def test_format_user_friendly_error_validation_403(self):
+        """Test validation error formatting for 403."""
+        service = ImageService()
+        error = service._format_user_friendly_error("validation", "HTTP 403: Forbidden")
+        assert "403" in error
+        assert "denied" in error.lower()
+
+    @pytest.mark.asyncio
+    async def test_validate_with_session_client_error(self):
+        """Test validation with client error."""
+        service = ImageService()
+        image = Image(url="https://example.com/image.jpg")
+        
+        mock_session = AsyncMock()
+        mock_head_cm = AsyncMock()
+        mock_head_cm.__aenter__.side_effect = aiohttp.ClientError("Network error")
+        mock_session.head = MagicMock(return_value=mock_head_cm)
+        
+        success, error = await service._validate_with_session(image, mock_session)
+        assert success is False
+        assert "Network error" in error
+
+    @pytest.mark.asyncio
+    async def test_validate_with_session_general_exception(self):
+        """Test validation with general exception."""
+        service = ImageService()
+        image = Image(url="https://example.com/image.jpg")
+        
+        mock_session = AsyncMock()
+        mock_head_cm = AsyncMock()
+        mock_head_cm.__aenter__.side_effect = Exception("Unexpected error")
+        mock_session.head = MagicMock(return_value=mock_head_cm)
+        
+        success, error = await service._validate_with_session(image, mock_session)
+        assert success is False
+        assert "Unexpected error" in error
