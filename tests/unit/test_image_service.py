@@ -20,7 +20,7 @@ class TestImageService:
 
     @pytest.mark.asyncio
     async def test_validate_and_create_embed_success(self, service):
-    """Test successful image validation and embed creation."""
+        """Test successful image validation and embed creation."""
         url = "https://example.com/image.jpg"
 
         # Mock successful HTTP response
