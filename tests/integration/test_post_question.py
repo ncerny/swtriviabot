@@ -145,8 +145,6 @@ async def test_post_question_modal_submit_with_previous_answers(mock_interaction
     modal.yesterday_winners.value = "Player1, Player2"
     modal.todays_question = Mock()
     modal.todays_question.value = "What is the capital of France?"
-    modal.image_url = Mock()
-    modal.image_url.value = ""
     
     await modal.on_submit(mock_interaction)
     
@@ -158,7 +156,7 @@ async def test_post_question_modal_submit_with_previous_answers(mock_interaction
     # Verify question was posted to channel
     mock_channel.send.assert_called_once()
     call_args = mock_channel.send.call_args
-    assert "embed" in call_args[1]
+    assert "content" in call_args[1]
     assert "view" in call_args[1]
     
     # Verify admin received previous answers
@@ -185,8 +183,6 @@ async def test_post_question_modal_submit_no_previous_answers(mock_interaction, 
     modal.yesterday_winners.value = ""
     modal.todays_question = Mock()
     modal.todays_question.value = "What is the capital of France?"
-    modal.image_url = Mock()
-    modal.image_url.value = ""
     
     await modal.on_submit(mock_interaction)
     
@@ -198,29 +194,7 @@ async def test_post_question_modal_submit_no_previous_answers(mock_interaction, 
     assert "No previous answers to display" in followup_call[0][0]
 
 
-@pytest.mark.asyncio
-async def test_post_question_modal_with_image(mock_interaction, mock_channel, tmp_path):
-    """Test posting question with image URL."""
-    storage_service.DATA_DIR = tmp_path
-    guild_id = str(mock_interaction.guild_id)
-    
-    # Create modal with image
-    modal = PostQuestionModal(guild_id=guild_id, channel=mock_channel)
-    modal.yesterday_answer = Mock()
-    modal.yesterday_answer.value = ""
-    modal.yesterday_winners = Mock()
-    modal.yesterday_winners.value = "no winners"
-    modal.todays_question = Mock()
-    modal.todays_question.value = "What is this?"
-    modal.image_url = Mock()
-    modal.image_url.value = "https://example.com/image.png"
-    
-    await modal.on_submit(mock_interaction)
-    
-    # Verify embed has image
-    call_args = mock_channel.send.call_args
-    embed = call_args[1]["embed"]
-    assert embed.image.url == "https://example.com/image.png"
+# Removed: test_post_question_modal_with_image - modal no longer processes image URLs
 
 
 @pytest.mark.asyncio
@@ -228,7 +202,7 @@ async def test_post_question_modal_no_winners_message(mock_interaction, mock_cha
     """Test that 'no winners' shows appropriate message."""
     storage_service.DATA_DIR = tmp_path
     guild_id = str(mock_interaction.guild_id)
-    
+
     # Create modal
     modal = PostQuestionModal(guild_id=guild_id, channel=mock_channel)
     modal.yesterday_answer = Mock()
@@ -237,15 +211,13 @@ async def test_post_question_modal_no_winners_message(mock_interaction, mock_cha
     modal.yesterday_winners.value = "No Winners"  # Should trigger no winners message
     modal.todays_question = Mock()
     modal.todays_question.value = "Test Question"
-    modal.image_url = Mock()
-    modal.image_url.value = ""
-    
+
     await modal.on_submit(mock_interaction)
-    
+
     # Verify message contains "no winners" text
     call_args = mock_channel.send.call_args
-    embed = call_args[1]["embed"]
-    assert "no winners" in embed.description.lower()
+    content = call_args[1]["content"]
+    assert "no winners" in content.lower()
 
 
 @pytest.mark.asyncio

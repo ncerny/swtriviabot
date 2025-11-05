@@ -1,6 +1,7 @@
 """
 Unit tests for image_service.py
 """
+import asyncio
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from discord import Embed
@@ -19,7 +20,7 @@ class TestImageService:
 
     @pytest.mark.asyncio
     async def test_validate_and_create_embed_success(self, service):
-        """Test successful image validation and embed creation."""
+    """Test successful image validation and embed creation."""
         url = "https://example.com/image.jpg"
 
         # Mock successful HTTP response
@@ -32,9 +33,16 @@ class TestImageService:
         mock_response.reason = 'OK'
 
         with patch('aiohttp.ClientSession') as mock_session_class:
-            mock_session = AsyncMock()
-            mock_session_class.return_value.__aenter__.return_value = mock_session
+            mock_session = MagicMock()
+            mock_session_class.return_value = mock_session
+
+            # Mock the context manager for the session
+            mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+            mock_session.__aexit__ = AsyncMock(return_value=None)
+
+            # Mock the head request
             mock_session.head.return_value.__aenter__.return_value = mock_response
+            mock_session.head.return_value.__aexit__.return_value = None
 
             success, result = await service.validate_and_create_embed(url)
 
