@@ -55,36 +55,36 @@ class TestImageHidingIntegration:
         modal.todays_question.value = "What is the capital of France?"
 
     # Mock failed image validation with the actual error that would be returned
-        error_message = "❌ **Image Error**: This appears to be a webpage link, not a direct image. Right-click on the image and select 'Copy image address' or 'Copy image URL' to get the direct link."
-        with patch('src.services.image_service.validate_image_url') as mock_validate:
+    error_message = "❌ **Image Error**: This appears to be a webpage link, not a direct image. Right-click on the image and select 'Copy image address' or 'Copy image URL' to get the direct link."
+    with patch('src.services.image_service.validate_image_url') as mock_validate:
         mock_validate.return_value = (False, error_message)
 
         # Mock other services
         with patch('src.services.answer_service.get_session', return_value=None), \
-    patch('src.services.answer_service.reset_session'), \
-    patch('src.services.answer_service.create_session'), \
-    patch('src.services.storage_service.save_session_to_disk'), \
-    patch('discord.ui.View') as mock_view_class:
+                 patch('src.services.answer_service.reset_session'), \
+                 patch('src.services.answer_service.create_session'), \
+                 patch('src.services.storage_service.save_session_to_disk'), \
+                 patch('discord.ui.View') as mock_view_class:
 
-    mock_view = MagicMock()
-    mock_view_class.return_value = mock_view
+                mock_view = MagicMock()
+                mock_view_class.return_value = mock_view
 
-    # Execute modal submission
-    await modal.on_submit(mock_interaction)
+                # Execute modal submission
+                await modal.on_submit(mock_interaction)
 
-    # Verify error message was sent
-    mock_channel.send.assert_called()
-    call_args = mock_channel.send.call_args_list
+                # Verify error message was sent
+                mock_channel.send.assert_called()
+                call_args = mock_channel.send.call_args_list
 
-    # Find the error message call
-    error_call = None
-    for call in call_args:
-    if call.kwargs.get('content', '').startswith('⚠️ **Image Error**'):
-    error_call = call
-    break
+                # Find the error message call
+                error_call = None
+                for call in call_args:
+                    if call.kwargs.get('content', '').startswith('⚠️ **Image Error**'):
+                        error_call = call
+                        break
 
-    assert error_call is not None
-    assert error_message in error_call.kwargs['content']
+                assert error_call is not None
+                assert error_message in error_call.kwargs['content']
 
     @pytest.mark.asyncio
     async def test_post_question_without_image(self, mock_interaction, mock_channel):
@@ -97,7 +97,7 @@ class TestImageHidingIntegration:
         modal.yesterday_winners = MagicMock()
         modal.yesterday_winners.value = ""
         modal.todays_question = MagicMock()
-        modal.todays_question.value = "What is the capital of France?"
+            modal.todays_question.value = "What is the capital of France?"
 
         # Mock services
         with patch('src.services.answer_service.get_session', return_value=None), \
@@ -114,8 +114,8 @@ class TestImageHidingIntegration:
 
             # Verify no image validation was called
             with patch('src.services.image_service.validate_image_url') as mock_validate:
-                # Should not be called since no image input
-                assert not mock_validate.called
+            # Should not be called since no image input
+            assert not mock_validate.called
 
     @pytest.mark.asyncio
     async def test_post_question_with_follow_up_image(self, mock_interaction, mock_channel):

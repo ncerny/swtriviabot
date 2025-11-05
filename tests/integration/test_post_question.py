@@ -352,6 +352,3 @@ async def test_answer_button_persistent_view():
     for item in button.children:
         if isinstance(item, discord.ui.Button):
             assert item.custom_id == "trivia:submit_answer"
-
-
-@pytest.mark.asyncio
