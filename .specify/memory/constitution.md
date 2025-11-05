@@ -1,22 +1,3 @@
-<!--
-Sync Impact Report
-Version change: (template) → 1.0.0
-Modified principles: All template placeholders replaced with concrete principles
-Added sections: Performance Standards, Development Workflow
-Removed sections: Generic placeholder sections
-Templates requiring updates:
-- .specify/templates/plan-template.md: ✅ Compatible (Constitution Check section present)
-- .specify/templates/spec-template.md: ✅ Compatible (user stories and testing already aligned)
-- .specify/templates/tasks-template.md: ✅ Compatible (testing and performance hooks present)
-- .specify/templates/commands/: ⚠ Directory not found - manual review needed if created
-- README.md: ⚠ File not found - should be created to document project and principles
-Follow-up TODOs:
-- TODO(RATIFICATION_DATE): Original ratification date unknown - set when determined
-- Consider creating README.md to introduce the project and reference constitution
-- Consider creating perf/ directory for benchmark scripts
-- Consider creating waivers.md for tracking governance waivers
--->
-
 # SWTriviaBot Constitution
 
 ## Core Principles
@@ -131,3 +112,44 @@ Review → Merge → Release → Observe. Each phase MUST satisfy constitutional
    prior version and reasons for removal.
 
 **Version**: 1.0.0 | **Ratified**: TODO(RATIFICATION_DATE): Original ratification date unknown | **Last Amended**: 2025-10-25
+
+### [PRINCIPLE_2_NAME]
+<!-- Example: II. CLI Interface -->
+[PRINCIPLE_2_DESCRIPTION]
+<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+
+### [PRINCIPLE_3_NAME]
+<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
+[PRINCIPLE_3_DESCRIPTION]
+<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+
+### [PRINCIPLE_4_NAME]
+<!-- Example: IV. Integration Testing -->
+[PRINCIPLE_4_DESCRIPTION]
+<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+
+### [PRINCIPLE_5_NAME]
+<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
+[PRINCIPLE_5_DESCRIPTION]
+<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+
+## [SECTION_2_NAME]
+<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+
+[SECTION_2_CONTENT]
+<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+
+## [SECTION_3_NAME]
+<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+
+[SECTION_3_CONTENT]
+<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+
+## Governance
+<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
+
+[GOVERNANCE_RULES]
+<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+
+**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
+<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->

@@ -1,9 +1,21 @@
 """Slash command handler for /post-question command."""
 
+import asyncio
+import os
+import re
 import discord
 from discord import app_commands, ui
+from dotenv import load_dotenv
+import aiohttp
 
-from src.services import answer_service, storage_service
+# Load environment variables from .env file
+load_dotenv()
+
+from src.services import answer_service, storage_service, image_service
+
+
+
+
 
 
 
@@ -34,22 +46,230 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
         style=discord.TextStyle.paragraph,
     )
 
-    image_url = ui.TextInput(
-        label="Image URL (optional)",
-        placeholder="Direct URL to image",
-        required=False,
-        max_length=500,
-        style=discord.TextStyle.short,
-    )
+
 
     def __init__(self, guild_id: int, channel: discord.TextChannel):
         super().__init__()
         self.guild_id = str(guild_id)  # Convert to string for consistency with answer_service
         self.channel = channel
+        self.interaction = None  # Will be set in on_submit
+
+
+
+    async def _wait_for_image_attachment(self, timeout: float = 15.0) -> discord.Embed | None:
+        """
+        Wait for a follow-up message with an image embed from the same user.
+
+        Args:
+            timeout: Seconds to wait for the image message
+
+        Returns:
+            Embed if image found, None if timeout or no image
+        """
+        try:
+            # Wait for the next message from the same user in the same channel
+            message = await self.interaction.client.wait_for(
+                'message',
+                timeout=timeout,
+                check=lambda m: (
+                    m.author == self.interaction.user and
+                    m.channel == self.channel and
+                    (m.embeds or m.attachments or 'http' in m.content)  # Has embeds, attachments, or URLs
+                )
+            )
+
+            # Check for image embeds (Tenor GIFs, uploaded images, etc.)
+            if message.embeds:
+                for embed in message.embeds:
+                    if embed.type == 'image' or embed.type == 'gifv' or (embed.image and embed.image.url):
+                        # Always delete the user's message since we're re-posting the image
+                        try:
+                            await message.delete()
+                        except:
+                            pass  # Ignore delete errors
+
+                        # For Tenor embeds, always try to resolve to proper GIF URL
+                        tenor_url = None
+
+                        # Check all possible Tenor URL sources
+                        if embed.url and 'tenor.com' in embed.url:
+                            tenor_url = embed.url
+                        elif embed.image and embed.image.url and 'tenor.com' in embed.image.url:
+                            tenor_url = embed.image.url
+                        elif embed.video and embed.video.url and 'tenor.com' in embed.video.url:
+                            tenor_url = embed.video.url
+
+                        # If we found any Tenor URL, resolve it to get the proper GIF
+                        if tenor_url:
+                            resolved_embed = await self._resolve_tenor_url(tenor_url)
+                            if resolved_embed:
+                                return resolved_embed
+
+                        # Fallback: use the original embed's image URL (for non-Tenor images)
+                        if embed.image and embed.image.url:
+                            embed_copy = discord.Embed()
+                            if embed.title:
+                                embed_copy.title = embed.title
+                            if embed.description:
+                                embed_copy.description = embed.description
+                            embed_copy.set_image(url=embed.image.url)
+                            if embed.thumbnail:
+                                embed_copy.set_thumbnail(url=embed.thumbnail.url)
+                            if embed.footer:
+                                embed_copy.set_footer(text=embed.footer.text, icon_url=embed.footer.icon_url)
+                            return embed_copy
+
+
+
+            # Check for attachments (uploaded images)
+            if message.attachments:
+                for attachment in message.attachments:
+                    if attachment.content_type and attachment.content_type.startswith('image/'):
+                        # Always delete the user's message since we're re-posting the image
+                        try:
+                            await message.delete()
+                        except:
+                            pass
+
+                        # Create embed for the attachment
+                        embed = discord.Embed()
+                        embed.set_image(url=attachment.url)
+                        return embed
+
+            # Check for image URLs in message content (if no embeds or attachments)
+            if not (message.embeds or message.attachments):
+                import re
+                from src.services.image_service import validate_image_url
+
+            # Look for URLs in the message content
+                url_pattern = r'https?://[^\s]+'
+                urls = re.findall(url_pattern, message.content.strip())
+                if urls:
+                    # Check if it's a Tenor URL - handle differently
+                    if 'tenor.com' in urls[0]:
+                        resolved_embed = await self._resolve_tenor_url(urls[0])
+                        if resolved_embed:
+                            # Delete the user's message
+                            try:
+                                await message.delete()
+                            except:
+                                pass
+                            return resolved_embed
+                    else:
+                        # Process as direct image URL
+                        success, result = await validate_image_url(urls[0])
+                        if success and isinstance(result, discord.Embed):
+                            # Delete the user's message
+                            try:
+                                await message.delete()
+                            except:
+                                pass
+                            return result
+
+        except asyncio.TimeoutError:
+            # No image message received within timeout
+            pass
+
+        return None
+
+    async def _resolve_tenor_url(self, url: str) -> discord.Embed | None:
+        """
+        Resolve any Tenor URL to the actual full GIF using the API.
+
+        Args:
+            url: Any Tenor URL (HTML page or media URL)
+
+        Returns:
+            Discord embed with the actual GIF, or None if resolution fails
+        """
+        try:
+            import re
+            tenor_id = None
+
+            # Check for HTML URL format: https://tenor.com/view/[slug]-[id]
+            # The ID is after the last dash in the URL
+            match = re.search(r'tenor\.com/view/.*-(\d+)(?:$|\?)', url)
+            if match:
+                tenor_id = match.group(1)
+            else:
+                # Check for media URL format: https://media.tenor.com/[id]/[filename].gif
+                match = re.search(r'media\.tenor\.com/([a-zA-Z0-9]+)/', url)
+                if match:
+                    tenor_id = match.group(1)
+
+            if not tenor_id:
+                print(f"DEBUG: Could not extract Tenor ID from URL: {url}")
+                return None
+
+            print(f"DEBUG: Extracted Tenor ID: {tenor_id}")
+
+            api_key = os.getenv('TENOR_API_KEY')
+            print(f"DEBUG: Tenor API key present: {api_key is not None}")
+
+            if not api_key:
+                print("DEBUG: No Tenor API key configured")
+                return None
+
+            # Use Tenor API to get the GIF details
+            api_url = "https://tenor.googleapis.com/v2/posts"
+            params = {
+                'ids': tenor_id,
+                'key': api_key
+            }
+
+            print(f"DEBUG: Making API call to: {api_url}?{'&'.join(f'{k}={v}' for k,v in params.items())}")
+
+            # Create a temporary session for the API call
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10.0)) as temp_session:
+                async with temp_session.get(api_url, params=params) as response:
+                    if response.status != 200:
+                        return None
+
+                    try:
+                        data = await response.json()
+                        print(f"DEBUG: Tenor API response: {data}")
+                    except Exception as e:
+                        print(f"DEBUG: Failed to parse JSON response: {e}")
+                        raw_text = await response.text()
+                        print(f"DEBUG: Raw response text: {raw_text[:500]}")
+                        return None
+
+                    if not data or not isinstance(data, dict):
+                        print(f"DEBUG: Invalid response data: {type(data)}")
+                        return None
+
+                    if not data.get('results'):
+                        print("DEBUG: No results in Tenor API response")
+                        return None
+
+                    result = data['results'][0]
+                    media_formats = result.get('media_formats', {})
+                    print(f"DEBUG: Media formats available: {list(media_formats.keys())}")
+
+                    gif_info = media_formats.get('gif')
+
+                    if not gif_info or not gif_info.get('url'):
+                        print("DEBUG: No GIF info or URL in Tenor response")
+                        return None
+
+                    gif_url = gif_info['url']
+                    print(f"DEBUG: Resolved Tenor GIF URL: {gif_url}")
+
+                    # Create embed with the actual GIF
+                    embed = discord.Embed()
+                    embed.set_image(url=gif_url)
+                    return embed
+
+        except Exception as e:
+            print(f"Error resolving Tenor URL {url}: {e}")
+            return None
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
         """Handle modal submission."""
         try:
+            # Store interaction for use in other methods
+            self.interaction = interaction
+
             # Defer response
             await interaction.response.defer(ephemeral=True)
 
@@ -61,7 +281,8 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
                     "Please give me the following permissions:\n"
                     "• Send Messages\n"
                     "• Embed Links\n"
-                    "• Use Application Commands",
+                    "• Use Application Commands\n"
+                    "• Manage Messages (optional - for deleting follow-up image messages)",
                     ephemeral=True,
                 )
                 return
@@ -116,42 +337,46 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
             session = answer_service.create_session(self.guild_id)
             storage_service.save_session_to_disk(self.guild_id, session)
 
-            # Message 1: Yesterday's results (if any)
-            yesterday_parts = []
-            
-            # Add yesterday's answer if provided
-            if self.yesterday_answer.value.strip():
-                yesterday_parts.append(f"**Yesterday's Answer...**\n{self.yesterday_answer.value.strip()}")
 
-            # Add yesterday's winners if provided
-            if self.yesterday_winners.value.strip() and self.yesterday_winners.value.strip() != "" and self.yesterday_winners.value.strip().lower() != "no winners":
-                yesterday_parts.append(f"Congrats to {self.yesterday_winners.value.strip()} your gold has been mailed. Thanks for playing!")
-            else:
-                yesterday_parts.append(f"Unfortunately we had no winners, better luck next time!")
 
-            # Send yesterday's message if there's content
-            if yesterday_parts:
-                yesterday_content = "\n\n".join(yesterday_parts)
-                await self.channel.send(content=yesterday_content)
+            # Create comprehensive message content
+            message_parts = []
 
-            # Message 2: Today's question + image
-            question_parts = []
-            question_parts.append(f"**Today's Question...**\n{self.todays_question.value.strip()}")
-            
-            # Add image URL if provided
-            if self.image_url.value and self.image_url.value.strip():
-                image_url = self.image_url.value.strip()
-                question_parts.append(image_url)
-            
-            question_content = "\n\n".join(question_parts)
-            await self.channel.send(content=question_content)
-            
-            # Message 3: Instruction + button
+            # Yesterday's results section
+            if self.yesterday_answer.value.strip() or self.yesterday_winners.value.strip():
+                if self.yesterday_answer.value.strip():
+                    message_parts.append(f"**Yesterday's Answer...**\n{self.yesterday_answer.value.strip()}")
+
+                winners_text = ""
+                if self.yesterday_winners.value.strip() and self.yesterday_winners.value.strip() != "no winners":
+                    winners_text = f"Congrats to {self.yesterday_winners.value.strip()} your gold has been mailed. Thanks for playing!"
+                else:
+                    winners_text = "Unfortunately we had no winners, better luck next time!"
+
+                message_parts.append(winners_text)
+                message_parts.append("")  # Empty line
+
+            # Today's question
+            message_parts.append(f"**Today's Question...**\n{self.todays_question.value.strip()}")
+            message_parts.append("")  # Empty line
+
+            # Create the comprehensive message (without button instruction text)
+            full_content = "\n".join(message_parts)
             view = AnswerButton()
-            await self.channel.send(
-                content="Please click the button below to submit your answer!",
-                view=view,
+
+            # Send the complete message with button
+            question_message = await self.channel.send(
+                content=full_content,
+                view=view
             )
+
+            # Wait for potential image attachment in follow-up message (up to 5 minutes)
+            image_embed = await self._wait_for_image_attachment(timeout=300.0)  # 5 minutes
+
+            # Edit message to add image if found
+            if image_embed:
+                # Edit the message to include the image
+                await question_message.edit(embed=image_embed)
 
         except ValueError as e:
             await interaction.followup.send(f"❌ {str(e)}", ephemeral=True)

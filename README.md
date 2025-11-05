@@ -10,11 +10,20 @@ A Discord bot for managing trivia game answers with slash commands. Players subm
 
 - **View Submissions**: Admins list all answers with `/list-answers` command
 - **Reset Sessions**: Admins clear all answers with `/reset-answers` command
-- **Auto-Attach Images**: Post a question without an image, then post an image within 3 minutes - the bot automatically attaches it and cleans up your follow-up message
+- **Auto-Attach Images**: Post a question, then immediately post an image or GIF - the bot automatically re-posts it and cleans up your follow-up message
+- **Native Image Support**: Works with Discord's GIF picker, Tenor embeds, uploaded images, and direct links
 - **Multi-Server Support**: Isolated session state per Discord server
 - **Persistent Storage**: Session data saved to disk for durability
 
 ## Quick Start
+
+### How to Post Questions with Images
+
+1. Run `/post-question` and fill out the question text
+2. The bot posts a complete message with yesterday's results, today's question, and answer button
+3. Within 5 minutes, post your image or GIF in the same channel
+4. The bot automatically adds the image to the question message and deletes your follow-up message
+5. Everything appears as one cohesive message
 
 ### Prerequisites
 

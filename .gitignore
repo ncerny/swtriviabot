@@ -66,3 +66,6 @@ yarn-error.log*
 # Logs
 *.log
 logs/
+
+# AI planning documents (ephemeral)
+history/
