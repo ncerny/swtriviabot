@@ -145,8 +145,10 @@ async def test_post_question_modal_submit_with_previous_answers(mock_interaction
     modal.yesterday_winners.value = "Player1, Player2"
     modal.todays_question = Mock()
     modal.todays_question.value = "What is the capital of France?"
-    
-    await modal.on_submit(mock_interaction)
+
+    # Mock image attachment waiting to return None (no image)
+    with patch.object(modal, '_wait_for_image_attachment', return_value=None):
+        await modal.on_submit(mock_interaction)
     
     # Verify session was reset
     session = answer_service.get_session(guild_id)
@@ -183,8 +185,10 @@ async def test_post_question_modal_submit_no_previous_answers(mock_interaction, 
     modal.yesterday_winners.value = ""
     modal.todays_question = Mock()
     modal.todays_question.value = "What is the capital of France?"
-    
-    await modal.on_submit(mock_interaction)
+
+    # Mock image attachment waiting to return None (no image)
+    with patch.object(modal, '_wait_for_image_attachment', return_value=None):
+        await modal.on_submit(mock_interaction)
     
     # Verify question was posted
     mock_channel.send.assert_called_once()

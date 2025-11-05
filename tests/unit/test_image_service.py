@@ -253,78 +253,78 @@ class TestImageModel:
         assert service._is_url("   ") is False
         assert service._is_url("not-a-url") is False
 
-    @pytest.mark.asyncio
-    async def test_process_search_term_success(self, service):
+        @pytest.mark.asyncio
+        async def test_process_search_term_success(self, service):
         """Test successful Tenor search term processing."""
         # Mock Tenor API response with multiple results
         mock_response_data = {
-            "results": [
-                {
-                    "media_formats": {
-                        "gif": {"url": "https://media.tenor.com/gif1.gif"},
-                        "tinygif": {"url": "https://media.tenor.com/tiny1.gif"}
-                    }
-                },
-                {
-                    "media_formats": {
-                        "gif": {"url": "https://media.tenor.com/gif2.gif"}
-                    }
-                }
-            ]
+        "results": [
+        {
+        "media_formats": {
+        "gif": {"url": "https://media.tenor.com/gif1.gif"},
+        "tinygif": {"url": "https://media.tenor.com/tiny1.gif"}
+        }
+        },
+        {
+        "media_formats": {
+        "gif": {"url": "https://media.tenor.com/gif2.gif"}
+        }
+        }
+        ]
         }
 
         with patch.dict(os.environ, {'TENOR_API_KEY': 'test-key'}), \
-             patch('aiohttp.ClientSession') as mock_session_class:
+        patch('aiohttp.ClientSession') as mock_session_class:
 
-            mock_session = AsyncMock()
-            mock_session_class.return_value.__aenter__.return_value = mock_session
+        mock_session = AsyncMock()
+        mock_session_class.return_value.__aenter__.return_value = mock_session
 
-            # Mock the API response
-            mock_response = AsyncMock()
-            mock_response.status = 200
-            mock_response.json = AsyncMock(return_value=mock_response_data)
-            mock_response_cm = AsyncMock()
-            mock_response_cm.__aenter__.return_value = mock_response
-            mock_session.get.return_value = mock_response_cm
+        # Mock the API response
+        mock_response = AsyncMock()
+        mock_response.status = 200
+        mock_response.json = AsyncMock(return_value=mock_response_data)
+        mock_response_cm = AsyncMock()
+        mock_response_cm.__aenter__.return_value = mock_response
+        mock_session.get.return_value = mock_response_cm
 
-            # Mock successful image validation for the returned GIF URL
-            with patch.object(service, '_validate_image_accessibility') as mock_validate:
-                mock_validate.return_value = (True, "")
+        # Mock successful image validation for the returned GIF URL
+        with patch.object(service, '_validate_image_accessibility') as mock_validate:
+        mock_validate.return_value = (True, "")
 
-                success, result = await service._process_search_term("dancing cat")
+        success, result = await service._process_search_term("dancing cat")
 
-                assert success is True
-                assert isinstance(result, list)
-                assert len(result) == 2
-                assert result[0]['url'] == "https://media.tenor.com/gif1.gif"
+        assert success is True
+        assert isinstance(result, list)
+        assert len(result) == 2
+        assert result[0]['url'] == "https://media.tenor.com/gif1.gif"
 
-    @pytest.mark.asyncio
-    async def test_process_search_term_no_api_key(self, service):
+        @pytest.mark.asyncio
+        async def test_process_search_term_no_api_key(self, service):
         """Test search term processing without API key."""
         with patch.dict(os.environ, {}, clear=True):  # Clear TENOR_API_KEY
-            success, result = await service._process_search_term("dancing cat")
+        success, result = await service._process_search_term("dancing cat")
 
-            assert success is False
-            assert "Tenor API key not configured" in result
+        assert success is False
+        assert "Tenor API key not configured" in result
 
-    @pytest.mark.asyncio
-    async def test_process_search_term_no_results(self, service):
+        @pytest.mark.asyncio
+        async def test_process_search_term_no_results(self, service):
         """Test search term processing with no Tenor results."""
         with patch.dict(os.environ, {'TENOR_API_KEY': 'test-key'}), \
-             patch('aiohttp.ClientSession') as mock_session_class:
+        patch('aiohttp.ClientSession') as mock_session_class:
 
-            mock_session = AsyncMock()
-            mock_session_class.return_value.__aenter__.return_value = mock_session
+        mock_session = AsyncMock()
+        mock_session_class.return_value.__aenter__.return_value = mock_session
 
-            # Mock empty results response
-            mock_response = AsyncMock()
-            mock_response.status = 200
-            mock_response.json = AsyncMock(return_value={"results": []})
-            mock_response_cm = AsyncMock()
-            mock_response_cm.__aenter__.return_value = mock_response
-            mock_session.get.return_value = mock_response_cm
+        # Mock empty results response
+        mock_response = AsyncMock()
+        mock_response.status = 200
+        mock_response.json = AsyncMock(return_value={"results": []})
+        mock_response_cm = AsyncMock()
+        mock_response_cm.__aenter__.return_value = mock_response
+        mock_session.get.return_value = mock_response_cm
 
-            success, result = await service._process_search_term("nonexistent search")
+        success, result = await service._process_search_term("nonexistent search")
 
-            assert success is False
-            assert "No GIFs found for 'nonexistent search'" in result
+        assert success is False
+        assert "No GIFs found for 'nonexistent search'" in result
