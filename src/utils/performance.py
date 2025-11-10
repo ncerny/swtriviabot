@@ -41,6 +41,9 @@ def monitor_performance(command_name: str) -> Callable:
 class PerformanceMetrics:
     """Track performance metrics for bot operations."""
 
+    # Limit metrics to prevent unbounded memory growth
+    MAX_METRICS_PER_COMMAND = 1000
+
     def __init__(self):
         """Initialize performance metrics tracker."""
         self.metrics = {
@@ -72,6 +75,10 @@ class PerformanceMetrics:
             self.metrics["command_times"][command_name] = []
         
         self.metrics["command_times"][command_name].append(execution_time_ms)
+        
+        # Trim to max size to prevent unbounded growth
+        if len(self.metrics["command_times"][command_name]) > self.MAX_METRICS_PER_COMMAND:
+            self.metrics["command_times"][command_name] = self.metrics["command_times"][command_name][-self.MAX_METRICS_PER_COMMAND:]
 
     def get_stats(self, command_name: str) -> dict[str, Any]:
         """Get performance statistics for a specific command.

@@ -21,6 +21,7 @@ from src.commands.list_answers import list_answers_command
 from src.commands.post_question import post_question_command, AnswerButton
 # from src.commands.metrics import metrics_command  # TODO: Implement metrics command
 from src.utils.performance import get_metrics
+from src.utils.resource_monitor import get_resource_monitor
 
 # Configure logging
 logging.basicConfig(
@@ -56,6 +57,23 @@ tree.add_command(post_question_command)
 # tree.add_command(metrics_command)  # TODO: Implement metrics command
 
 
+async def log_resource_stats_periodically() -> None:
+    """Background task to log resource stats every hour."""
+    import asyncio
+    await client.wait_until_ready()
+    monitor = get_resource_monitor()
+    
+    while not client.is_closed():
+        try:
+            monitor.log_stats("periodic check")
+            monitor.check_memory_threshold(warning_mb=100.0, critical_mb=120.0)
+        except Exception as e:
+            logger.error(f"Error logging resource stats: {e}", exc_info=True)
+        
+        # Wait 1 hour
+        await asyncio.sleep(3600)
+
+
 @client.event
 async def on_ready() -> None:
     """Called when the bot successfully connects to Discord."""
@@ -63,6 +81,10 @@ async def on_ready() -> None:
     logger.info(f"Logged in as {user_info}")
     print(f"✅ Logged in as {user_info}")
     print("---")
+    
+    # Log initial resource usage
+    monitor = get_resource_monitor()
+    monitor.log_stats("startup")
 
     # Register persistent views for buttons (must be done on every startup)
     client.add_view(AnswerButton())
@@ -99,6 +121,9 @@ async def on_ready() -> None:
 
     logger.info("Bot is ready!")
     print("🎮 Bot is ready!")
+    
+    # Start periodic resource monitoring
+    client.loop.create_task(log_resource_stats_periodically())
 
 
 @client.event
@@ -186,6 +211,10 @@ def graceful_shutdown(signum: int, frame: object) -> NoReturn:
     """
     logger.info(f"Received signal {signum}, shutting down gracefully...")
     print(f"\n🛑 Received signal {signum}, shutting down gracefully...")
+    
+    # Log final resource usage
+    monitor = get_resource_monitor()
+    monitor.log_stats("shutdown")
 
     # Save all sessions to disk
     try:
