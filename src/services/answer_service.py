@@ -1,14 +1,42 @@
 """Business logic for answer operations in the Discord Trivia Bot."""
 
-from datetime import datetime, timezone
+import logging
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from src.models.answer import Answer
 from src.models.session import TriviaSession
 from src.utils.validators import validate_answer_text
 
+logger = logging.getLogger(__name__)
+
 # Global in-memory session storage (keyed by guild_id)
 _sessions: dict[str, TriviaSession] = {}
+
+# Session TTL: 7 days (safety net in case questions aren't posted regularly)
+SESSION_TTL_DAYS = 7
+
+
+def _cleanup_stale_sessions() -> None:
+    """Remove sessions older than SESSION_TTL_DAYS with no activity.
+    
+    This is a safety net to prevent memory leaks if questions aren't posted regularly.
+    Normally /post-question resets sessions daily.
+    """
+    now = datetime.now(timezone.utc)
+    to_delete = []
+    
+    for guild_id, session in _sessions.items():
+        age_days = (now - session.last_activity).total_seconds() / 86400  # seconds in a day
+        if age_days > SESSION_TTL_DAYS:
+            to_delete.append(guild_id)
+            logger.warning(
+                f"Evicting stale session for guild {guild_id} "
+                f"(inactive for {age_days:.1f} days, TTL={SESSION_TTL_DAYS} days)"
+            )
+    
+    for guild_id in to_delete:
+        del _sessions[guild_id]
 
 
 def submit_answer(guild_id: str, user_id: str, username: str, text: str) -> tuple[Answer, bool]:
@@ -27,6 +55,9 @@ def submit_answer(guild_id: str, user_id: str, username: str, text: str) -> tupl
     Raises:
         ValueError: If answer text is invalid
     """
+    # Clean up stale sessions before processing
+    _cleanup_stale_sessions()
+    
     # Validate answer text
     sanitized_text = validate_answer_text(text)
 
