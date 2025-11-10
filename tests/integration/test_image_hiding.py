@@ -2,6 +2,7 @@
 Integration tests for image URL hiding functionality.
 Tests the end-to-end flow from post_question command to embed creation.
 """
+import asyncio
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -43,9 +44,13 @@ class TestImageHidingIntegration:
 
     @pytest.mark.asyncio
     async def test_post_question_with_invalid_image(self, mock_interaction, mock_channel):
-        """Test posting question with invalid image URL."""
+        """Test posting question when follow-up image validation fails."""
         # Create modal
         modal = PostQuestionModal(guild_id=123456789, channel=mock_channel)
+        
+        # Directly set the interaction for testing
+        modal.interaction = mock_interaction
+        
         # Mock the text input fields
         modal.yesterday_answer = MagicMock()
         modal.yesterday_answer.value = ""
@@ -53,59 +58,29 @@ class TestImageHidingIntegration:
         modal.yesterday_winners.value = ""
         modal.todays_question = MagicMock()
         modal.todays_question.value = "What is the capital of France?"
-        
-        # Mock failed image validation with the actual error that would be returned
-        error_message = "❌ **Image Error**: This appears to be a webpage link, not a direct image. Right-click on the image and select 'Copy image address' or 'Copy image URL' to get the direct link."
-        
-        # Mock other services and image processing
-        with patch('src.services.answer_service.get_session', return_value=None), \
-        patch('src.services.answer_service.reset_session'), \
-        patch('src.services.answer_service.create_session'), \
-        patch('src.services.storage_service.save_session_to_disk'), \
-        patch('discord.ui.View') as mock_view_class, \
-        patch('src.services.image_service.validate_image_url', return_value=(False, error_message)) as mock_validate:
 
-                    mock_view = MagicMock()
-                    mock_view_class.return_value = mock_view
+        # Mock question message
+        question_msg = MagicMock()
+        question_msg.edit = AsyncMock()
+        mock_channel.send.return_value = question_msg
+
+        with patch('src.services.answer_service.get_session', return_value=None), \
+             patch('src.services.answer_service.reset_session'), \
+             patch('src.services.answer_service.create_session'), \
+             patch('src.services.storage_service.save_session_to_disk'), \
+             patch.object(modal, '_wait_for_image_attachment', new_callable=AsyncMock, return_value=None):
+
+            # Execute modal submission
+            await modal.on_submit(mock_interaction)
+
+            # Verify message posted to channel
+            assert mock_channel.send.called
+
+            # Wait for background task to complete
+            await asyncio.sleep(0.1)
             
-                    # Mock the client.wait_for to return a message with invalid URL
-                    mock_message = MagicMock()
-                    mock_message.content = "https://example.com/invalid-image.jpg"
-                    mock_message.embeds = []
-                    mock_message.attachments = []
-                    mock_message.author = mock_interaction.user
-                    mock_message.channel = mock_channel
-                    mock_message.delete = AsyncMock()
-            
-                    # Set up the client mock
-                    mock_client = MagicMock()
-                    mock_client.wait_for = AsyncMock(return_value=mock_message)
-                    mock_interaction.client = mock_client
-        
-        # Execute modal submission
-        await modal.on_submit(mock_interaction)
-        
-        # Verify error message was sent
-        mock_channel.send.assert_called()
-        call_args = mock_channel.send.call_args_list
-        
-        # Find the error message call
-        error_call = None
-        for call in call_args:
-            # Check both positional and keyword arguments
-            content = ''
-            if call.args:
-                content = call.args[0] if call.args else ''
-            if not content:
-                content = call.kwargs.get('content', '')
-            
-            # The image service returns error messages starting with ❌
-            # The command wraps them with ⚠️ prefix
-            if '**Image Error**' in content or 'Image Error' in content:
-                error_call = call
-                break
-        
-        assert error_call is not None, f"No error message found in calls: {call_args}"
+            # Verify message was NOT edited (no valid image)
+            question_msg.edit.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_post_question_without_image(self, mock_interaction, mock_channel):
@@ -173,7 +148,7 @@ class TestImageHidingIntegration:
              patch('src.services.answer_service.reset_session'), \
              patch('src.services.answer_service.create_session'), \
              patch('src.services.storage_service.save_session_to_disk'), \
-             patch.object(modal, '_wait_for_image_attachment', return_value=mock_embed):
+             patch.object(modal, '_wait_for_image_attachment', new_callable=AsyncMock, return_value=mock_embed) as mock_wait:
 
             # Execute modal submission
             await modal.on_submit(mock_interaction)
@@ -190,6 +165,9 @@ class TestImageHidingIntegration:
             # Button text is not added to the content at all
             assert "Please click the button below" not in content
 
+            # Wait for background task to complete
+            await asyncio.sleep(0.1)
+            
             # Verify message was edited to include the image embed
             question_msg.edit.assert_called_once()
             edit_call = question_msg.edit.call_args

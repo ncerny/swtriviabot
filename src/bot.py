@@ -111,6 +111,30 @@ async def on_interaction(interaction: discord.Interaction) -> None:
     if interaction.type == discord.InteractionType.application_command:
         # Record command execution start time
         interaction.extras["start_time"] = time.perf_counter()
+        interaction.extras["logged_slow"] = False  # Track if we've logged slow warning
+
+
+@client.event
+async def on_interaction_response(interaction: discord.Interaction) -> None:
+    """Track interaction response timing to detect slow operations.
+
+    Args:
+        interaction: Discord interaction object
+    """
+    if "start_time" in interaction.extras and not interaction.extras.get("logged_slow", False):
+        elapsed_time = time.perf_counter() - interaction.extras["start_time"]
+        command_name = interaction.command.name if interaction.command else "unknown"
+        
+        # Warn if response took >2s (approaching Discord's 3s limit)
+        if elapsed_time > 2.0:
+            logger.warning(
+                f"Slow interaction response for /{command_name}: {elapsed_time:.2f}s "
+                f"(Discord requires <3s)"
+            )
+            interaction.extras["logged_slow"] = True
+        
+        # Record successful completion metrics
+        get_metrics().record_command(command_name, elapsed_time * 1000, success=True)
 
 
 @tree.error
@@ -128,6 +152,10 @@ async def on_app_command_error(
         elapsed_time = (time.perf_counter() - interaction.extras["start_time"]) * 1000
         command_name = interaction.command.name if interaction.command else "unknown"
         get_metrics().record_command(command_name, elapsed_time, success=False)
+        
+        # Log timing even on errors
+        if elapsed_time > 2000:  # >2s
+            logger.warning(f"Slow command before error /{command_name}: {elapsed_time/1000:.2f}s")
     
     logger.error(f"Command error in {interaction.command.name if interaction.command else 'unknown'}: {error}", exc_info=True)
 

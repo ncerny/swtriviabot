@@ -56,6 +56,24 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
 
 
 
+    async def _watch_for_image_and_edit(self, question_message: discord.Message, timeout: float = 300.0) -> None:
+        """
+        Background task: Watch for image attachment and edit message if found.
+        
+        This runs as a background task and does not block the interaction response.
+
+        Args:
+            question_message: The question message to edit with image
+            timeout: Seconds to wait for the image message (default: 5 minutes)
+        """
+        try:
+            image_embed = await self._wait_for_image_attachment(timeout=timeout)
+            if image_embed:
+                await question_message.edit(embed=image_embed)
+        except Exception as e:
+            # Log error but don't fail - question is already posted
+            print(f"Error in background image watch task: {e}")
+
     async def _wait_for_image_attachment(self, timeout: float = 15.0) -> discord.Embed | None:
         """
         Wait for a follow-up message with an image embed from the same user.
@@ -379,13 +397,8 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
                 view=view
             )
 
-            # Wait for potential image attachment in follow-up message (up to 5 minutes)
-            image_embed = await self._wait_for_image_attachment(timeout=300.0)  # 5 minutes
-
-            # Edit message to add image if found
-            if image_embed:
-                # Edit the message to include the image
-                await question_message.edit(embed=image_embed)
+            # Start background task to watch for image (doesn't block interaction)
+            asyncio.create_task(self._watch_for_image_and_edit(question_message, timeout=300.0))
 
         except ValueError as e:
             await interaction.followup.send(f"❌ {str(e)}", ephemeral=True)
