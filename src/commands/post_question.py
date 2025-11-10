@@ -1,6 +1,7 @@
 """Slash command handler for /post-question command."""
 
 import asyncio
+import logging
 import os
 import re
 import discord
@@ -12,6 +13,8 @@ import aiohttp
 load_dotenv()
 
 from src.services import answer_service, storage_service, image_service
+
+logger = logging.getLogger(__name__)
 
 
 
@@ -280,28 +283,44 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
             self.interaction = interaction
 
             # Defer response
-            await interaction.response.defer(ephemeral=True)
+            try:
+                await interaction.response.defer(ephemeral=True)
+            except discord.errors.InteractionResponded:
+                logger.warning("Interaction already responded in PostQuestionModal")
+            except Exception as e:
+                logger.error(f"Failed to defer PostQuestionModal interaction: {e}", exc_info=True)
+                return
 
             # Check bot permissions in the channel
             bot_permissions = self.channel.permissions_for(interaction.guild.me)
             if not bot_permissions.send_messages:
-                await interaction.followup.send(
-                    "❌ I don't have permission to send messages in this channel.\n\n"
-                    "Please give me the following permissions:\n"
-                    "• Send Messages\n"
-                    "• Embed Links\n"
-                    "• Use Application Commands\n"
-                    "• Manage Messages (optional - for deleting follow-up image messages)",
-                    ephemeral=True,
-                )
+                try:
+                    await interaction.followup.send(
+                        "❌ I don't have permission to send messages in this channel.\n\n"
+                        "Please give me the following permissions:\n"
+                        "• Send Messages\n"
+                        "• Embed Links\n"
+                        "• Use Application Commands\n"
+                        "• Manage Messages (optional - for deleting follow-up image messages)",
+                        ephemeral=True,
+                    )
+                except discord.errors.NotFound:
+                    logger.error("Interaction expired before permission error message", exc_info=True)
+                except Exception as e:
+                    logger.error(f"Failed to send permission error: {e}", exc_info=True)
                 return
 
             if not bot_permissions.embed_links:
-                await interaction.followup.send(
-                    "❌ I don't have permission to embed links in this channel.\n\n"
-                    "Please enable the 'Embed Links' permission for me.",
-                    ephemeral=True,
-                )
+                try:
+                    await interaction.followup.send(
+                        "❌ I don't have permission to embed links in this channel.\n\n"
+                        "Please enable the 'Embed Links' permission for me.",
+                        ephemeral=True,
+                    )
+                except discord.errors.NotFound:
+                    logger.error("Interaction expired before embed permission error", exc_info=True)
+                except Exception as e:
+                    logger.error(f"Failed to send embed permission error: {e}", exc_info=True)
                 return
 
             # Get previous answers before resetting
@@ -331,15 +350,25 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
 
             # Send previous answers to admin FIRST (before resetting)
             if previous_answers_message:
-                await interaction.followup.send(
-                    previous_answers_message,
-                    ephemeral=True,
-                )
+                try:
+                    await interaction.followup.send(
+                        previous_answers_message,
+                        ephemeral=True,
+                    )
+                except discord.errors.NotFound:
+                    logger.error("Interaction expired before sending previous answers", exc_info=True)
+                except Exception as e:
+                    logger.error(f"Failed to send previous answers: {e}", exc_info=True)
             else:
-                await interaction.followup.send(
-                    "✅ Question posted!\n\n_No previous answers to display._",
-                    ephemeral=True,
-                )
+                try:
+                    await interaction.followup.send(
+                        "✅ Question posted!\n\n_No previous answers to display._",
+                        ephemeral=True,
+                    )
+                except discord.errors.NotFound:
+                    logger.error("Interaction expired before confirmation message", exc_info=True)
+                except Exception as e:
+                    logger.error(f"Failed to send confirmation message: {e}", exc_info=True)
 
             # Reset session and create new one
             answer_service.reset_session(self.guild_id)
@@ -388,13 +417,30 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
                 await question_message.edit(embed=image_embed)
 
         except ValueError as e:
-            await interaction.followup.send(f"❌ {str(e)}", ephemeral=True)
+            try:
+                await interaction.followup.send(f"❌ {str(e)}", ephemeral=True)
+            except discord.errors.NotFound:
+                logger.error("Interaction expired before validation error message", exc_info=True)
+            except Exception as followup_error:
+                logger.error(f"Failed to send validation error: {followup_error}", exc_info=True)
         except Exception as e:
-            print(f"Error in post question modal: {e}")
-            await interaction.followup.send(
-                "❌ Something went wrong, please try again",
-                ephemeral=True,
+            logger.error(
+                f"Unexpected error in PostQuestionModal for user {interaction.user.id}",
+                exc_info=True,
+                extra={
+                    "guild_id": self.guild_id,
+                    "user_id": interaction.user.id
+                }
             )
+            try:
+                await interaction.followup.send(
+                    "❌ Something went wrong, please try again",
+                    ephemeral=True,
+                )
+            except discord.errors.NotFound:
+                logger.error("Interaction expired before error message", exc_info=True)
+            except Exception as followup_error:
+                logger.error(f"Failed to send error message: {followup_error}", exc_info=True)
 
 
 class AnswerModal(ui.Modal, title="Submit Your Trivia Answer"):
@@ -418,7 +464,13 @@ class AnswerModal(ui.Modal, title="Submit Your Trivia Answer"):
         """Handle modal submission."""
         try:
             # Defer the response to prevent action menu from appearing
-            await interaction.response.defer(ephemeral=True)
+            try:
+                await interaction.response.defer(ephemeral=True)
+            except discord.errors.InteractionResponded:
+                logger.warning("Interaction already responded in AnswerModal")
+            except Exception as e:
+                logger.error(f"Failed to defer AnswerModal interaction: {e}", exc_info=True)
+                return
             
             # Submit or update answer
             answer, is_update = answer_service.submit_answer(
@@ -439,18 +491,40 @@ class AnswerModal(ui.Modal, title="Submit Your Trivia Answer"):
             else:
                 message = "✅ Your answer has been recorded!"
 
-            await interaction.followup.send(message, ephemeral=True)
+            try:
+                await interaction.followup.send(message, ephemeral=True)
+            except discord.errors.NotFound:
+                logger.error("Interaction expired before answer confirmation", exc_info=True)
+            except Exception as e:
+                logger.error(f"Failed to send answer confirmation: {e}", exc_info=True)
 
         except ValueError as e:
             # Validation errors
-            await interaction.followup.send(f"❌ {str(e)}", ephemeral=True)
+            try:
+                await interaction.followup.send(f"❌ {str(e)}", ephemeral=True)
+            except discord.errors.NotFound:
+                logger.error("Interaction expired before validation error", exc_info=True)
+            except Exception as followup_error:
+                logger.error(f"Failed to send validation error: {followup_error}", exc_info=True)
         except Exception as e:
             # Unexpected errors
-            print(f"Error in answer modal: {e}")
-            await interaction.followup.send(
-                "❌ Something went wrong, please try again",
-                ephemeral=True,
+            logger.error(
+                f"Unexpected error in AnswerModal for user {interaction.user.id}",
+                exc_info=True,
+                extra={
+                    "guild_id": self.guild_id,
+                    "user_id": self.user_id
+                }
             )
+            try:
+                await interaction.followup.send(
+                    "❌ Something went wrong, please try again",
+                    ephemeral=True,
+                )
+            except discord.errors.NotFound:
+                logger.error("Interaction expired before error message", exc_info=True)
+            except Exception as followup_error:
+                logger.error(f"Failed to send error message: {followup_error}", exc_info=True)
 
 
 class AnswerButton(ui.View):
@@ -496,13 +570,30 @@ class AnswerButton(ui.View):
             await interaction.response.send_modal(modal)
 
         except Exception as e:
-            print(f"Error in submit answer button: {e}")
+            logger.error(
+                f"Error in submit answer button for user {interaction.user.id}",
+                exc_info=True,
+                extra={
+                    "guild_id": guild_id if 'guild_id' in locals() else None,
+                    "user_id": interaction.user.id
+                }
+            )
             # Check if we can still respond
-            if not interaction.response.is_done():
-                await interaction.response.send_message(
-                    "❌ Something went wrong, please try again",
-                    ephemeral=True,
-                )
+            try:
+                if not interaction.response.is_done():
+                    await interaction.response.send_message(
+                        "❌ Something went wrong, please try again",
+                        ephemeral=True,
+                    )
+                else:
+                    await interaction.followup.send(
+                        "❌ Something went wrong, please try again",
+                        ephemeral=True,
+                    )
+            except discord.errors.NotFound:
+                logger.error("Interaction expired before button error message", exc_info=True)
+            except Exception as followup_error:
+                logger.error(f"Failed to send button error message: {followup_error}", exc_info=True)
 
 
 @app_commands.command(
@@ -534,9 +625,26 @@ async def post_question_command(interaction: discord.Interaction) -> None:
         await interaction.response.send_modal(modal)
 
     except Exception as e:
-        print(f"Error in /post-question command: {e}")
-        if not interaction.response.is_done():
-            await interaction.response.send_message(
-                "❌ Something went wrong, please try again",
-                ephemeral=True,
-            )
+        logger.error(
+            f"Error in /post-question command for user {interaction.user.id}",
+            exc_info=True,
+            extra={
+                "guild_id": interaction.guild_id,
+                "user_id": interaction.user.id
+            }
+        )
+        try:
+            if not interaction.response.is_done():
+                await interaction.response.send_message(
+                    "❌ Something went wrong, please try again",
+                    ephemeral=True,
+                )
+            else:
+                await interaction.followup.send(
+                    "❌ Something went wrong, please try again",
+                    ephemeral=True,
+                )
+        except discord.errors.NotFound:
+            logger.error("Interaction expired before command error message", exc_info=True)
+        except Exception as followup_error:
+            logger.error(f"Failed to send command error message: {followup_error}", exc_info=True)

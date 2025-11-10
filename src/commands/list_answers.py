@@ -1,9 +1,13 @@
 """Slash command handler for /list-answers command."""
 
+import logging
+
 import discord
 from discord import app_commands
 
 from src.services import answer_service
+
+logger = logging.getLogger(__name__)
 
 
 @app_commands.command(
@@ -18,7 +22,14 @@ async def list_answers_command(interaction: discord.Interaction) -> None:
         interaction: Discord interaction object
     """
     # Defer response to prevent timeout
-    await interaction.response.defer(ephemeral=True)
+    try:
+        await interaction.response.defer(ephemeral=True)
+    except discord.errors.InteractionResponded:
+        # Already responded, can continue
+        logger.warning("Interaction already responded in /list-answers")
+    except Exception as e:
+        logger.error(f"Failed to defer /list-answers interaction: {e}", exc_info=True)
+        return
 
     try:
         # Get interaction details
@@ -26,20 +37,30 @@ async def list_answers_command(interaction: discord.Interaction) -> None:
 
         # Validate guild context (no DMs)
         if guild_id == "DM":
-            await interaction.followup.send(
-                "❌ This command can only be used in a server, not in DMs",
-                ephemeral=True,
-            )
+            try:
+                await interaction.followup.send(
+                    "❌ This command can only be used in a server, not in DMs",
+                    ephemeral=True,
+                )
+            except discord.errors.NotFound:
+                logger.error("Interaction expired before DM rejection message", exc_info=True)
+            except Exception as e:
+                logger.error(f"Failed to send DM rejection in /list-answers: {e}", exc_info=True)
             return
 
         # Get session and answers
         session = answer_service.get_session(guild_id)
 
         if not session or not session.answers:
-            await interaction.followup.send(
-                "📋 No answers submitted yet",
-                ephemeral=True,
-            )
+            try:
+                await interaction.followup.send(
+                    "📋 No answers submitted yet",
+                    ephemeral=True,
+                )
+            except discord.errors.NotFound:
+                logger.error("Interaction expired before empty answers message", exc_info=True)
+            except Exception as e:
+                logger.error(f"Failed to send empty answers message in /list-answers: {e}", exc_info=True)
             return
 
         # Format answer list to match post-question style
@@ -62,15 +83,33 @@ async def list_answers_command(interaction: discord.Interaction) -> None:
             f"_Total answers: {len(session.answers)}_"
         )
 
-        await interaction.followup.send(formatted_message, ephemeral=True)
+        try:
+            await interaction.followup.send(formatted_message, ephemeral=True)
+        except discord.errors.NotFound:
+            logger.error("Interaction expired before sending answers", exc_info=True)
+        except Exception as e:
+            logger.error(f"Failed to send answers in /list-answers: {e}", exc_info=True)
 
     except Exception as e:
         # Unexpected errors
-        print(f"Error in /list-answers command: {e}")
-        await interaction.followup.send(
-            "❌ Something went wrong, please try again",
-            ephemeral=True,
+        logger.error(
+            f"Unexpected error in /list-answers for user {interaction.user.id}",
+            exc_info=True,
+            extra={
+                "guild_id": interaction.guild_id,
+                "channel_id": interaction.channel_id,
+                "user_id": interaction.user.id
+            }
         )
+        try:
+            await interaction.followup.send(
+                "❌ Something went wrong, please try again",
+                ephemeral=True,
+            )
+        except discord.errors.NotFound:
+            logger.error("Interaction expired before error message", exc_info=True)
+        except Exception as followup_error:
+            logger.error(f"Failed to send error message in /list-answers: {followup_error}", exc_info=True)
 
 
 @list_answers_command.error
@@ -83,15 +122,27 @@ async def list_answers_error(
         interaction: Discord interaction object
         error: Error that occurred
     """
+    logger.error(
+        f"Command error in /list-answers for user {interaction.user.id}: {error}",
+        exc_info=True,
+        extra={
+            "guild_id": interaction.guild_id,
+            "user_id": interaction.user.id,
+            "error_type": type(error).__name__
+        }
+    )
+    
     if isinstance(error, app_commands.MissingPermissions):
-        await interaction.response.send_message(
-            "❌ You don't have permission to use this command (Administrator required)",
-            ephemeral=True,
-        )
+        error_message = "❌ You don't have permission to use this command (Administrator required)"
     else:
-        print(f"Unexpected error in /list-answers: {error}")
+        error_message = "❌ Something went wrong, please try again"
+    
+    try:
         if not interaction.response.is_done():
-            await interaction.response.send_message(
-                "❌ Something went wrong, please try again",
-                ephemeral=True,
-            )
+            await interaction.response.send_message(error_message, ephemeral=True)
+        else:
+            await interaction.followup.send(error_message, ephemeral=True)
+    except discord.errors.NotFound:
+        logger.error("Interaction expired before error message could be sent", exc_info=True)
+    except Exception as e:
+        logger.error(f"Failed to send error message in error handler: {e}", exc_info=True)

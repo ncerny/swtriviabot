@@ -1,7 +1,7 @@
 """Integration tests for list_answers command."""
 
 import pytest
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 from src.commands.list_answers import list_answers_command, list_answers_error
 from src.services import answer_service, storage_service
@@ -85,14 +85,20 @@ async def test_list_answers_dm_rejected(mock_interaction, tmp_path):
 @pytest.mark.asyncio
 async def test_list_answers_permission_error(mock_interaction):
     """Test permission error handler."""
+    # Mock is_done to return False so send_message is used
+    mock_interaction.response.is_done = MagicMock(return_value=False)
+    
     error = app_commands.MissingPermissions(["administrator"])
     
     await list_answers_error(mock_interaction, error)
     
     # Verify permission error message
+    mock_interaction.response.send_message.assert_called_once()
     call_args = mock_interaction.response.send_message.call_args
-    assert "don't have permission" in call_args[0][0]
-    assert call_args[1]["ephemeral"] is True
+    # Check keyword arguments instead of positional
+    assert call_args.kwargs["ephemeral"] is True
+    # Message is first positional arg
+    assert "don't have permission" in call_args.args[0]
 
 
 @pytest.mark.asyncio
