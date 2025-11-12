@@ -44,9 +44,11 @@ if not DISCORD_BOT_TOKEN:
     print("Please create a .env file with your bot token (see .env.example)")
     sys.exit(1)
 
-# Discord client with intents
-intents = discord.Intents.default()
-intents.message_content = True  # Required for slash commands
+# Discord client with minimal intents for slash-command-only bot
+# Use minimal intents to reduce memory usage from Discord's internal caches
+intents = discord.Intents.none()
+intents.guilds = True  # Required for guild context
+intents.message_content = True  # Required for wait_for('message') in image attachment
 
 client = discord.Client(intents=intents)
 tree = app_commands.CommandTree(client)
@@ -60,13 +62,25 @@ tree.add_command(post_question_command)
 async def log_resource_stats_periodically() -> None:
     """Background task to log resource stats every hour."""
     import asyncio
+    import gc
     await client.wait_until_ready()
     monitor = get_resource_monitor()
     
     while not client.is_closed():
         try:
+            # Log cache sizes for debugging
+            logger.info(
+                f"Discord cache sizes: "
+                f"messages={len(client.cached_messages)}, "
+                f"guilds={len(client.guilds)}"
+            )
+            
             monitor.log_stats("periodic check")
             monitor.check_memory_threshold(warning_mb=100.0, critical_mb=120.0)
+            
+            # Force garbage collection to free unused memory
+            collected = gc.collect()
+            logger.debug(f"Garbage collection freed {collected} objects")
         except Exception as e:
             logger.error(f"Error logging resource stats: {e}", exc_info=True)
         
