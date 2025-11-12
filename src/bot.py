@@ -48,7 +48,9 @@ if not DISCORD_BOT_TOKEN:
 intents = discord.Intents.default()
 intents.message_content = True  # Required for slash commands
 
-client = discord.Client(intents=intents)
+# Disable message cache to reduce memory usage (not needed for slash commands)
+# Default is max_messages=1000 which can use ~4MB
+client = discord.Client(intents=intents, max_messages=None)
 tree = app_commands.CommandTree(client)
 
 # Register commands
@@ -60,13 +62,25 @@ tree.add_command(post_question_command)
 async def log_resource_stats_periodically() -> None:
     """Background task to log resource stats every hour."""
     import asyncio
+    import gc
     await client.wait_until_ready()
     monitor = get_resource_monitor()
     
     while not client.is_closed():
         try:
+            # Log cache sizes for debugging
+            logger.info(
+                f"Discord cache sizes: "
+                f"messages={len(client.cached_messages)}, "
+                f"guilds={len(client.guilds)}"
+            )
+            
             monitor.log_stats("periodic check")
             monitor.check_memory_threshold(warning_mb=100.0, critical_mb=120.0)
+            
+            # Force garbage collection to free unused memory
+            collected = gc.collect()
+            logger.debug(f"Garbage collection freed {collected} objects")
         except Exception as e:
             logger.error(f"Error logging resource stats: {e}", exc_info=True)
         
