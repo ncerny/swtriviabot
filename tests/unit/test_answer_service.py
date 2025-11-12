@@ -1,7 +1,7 @@
 """Unit tests for answer_service module."""
 
 import pytest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from src.services import answer_service
 from src.models.answer import Answer
@@ -141,7 +141,36 @@ def test_multiple_users_same_guild():
     answer_service.submit_answer(guild_id, "user_3", "User3", "Answer3")
     
     session = answer_service.get_session(guild_id)
+    assert session is not None
     assert len(session.answers) == 3
     assert "user_1" in session.answers
     assert "user_2" in session.answers
     assert "user_3" in session.answers
+
+
+def test_submit_answer_evicts_stale_sessions(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Old sessions beyond TTL are removed before processing."""
+
+    now = datetime.now(timezone.utc)
+    stale = TriviaSession(
+        guild_id="stale",
+        created_at=now - timedelta(days=8),
+        last_activity=now - timedelta(days=8),
+    )
+
+    monkeypatch.setattr(answer_service, "_sessions", {"stale": stale})
+
+    class _Spy:
+        def __init__(self) -> None:
+            self.messages: list[str] = []
+
+        def warning(self, message: str) -> None:
+            self.messages.append(message)
+
+    spy = _Spy()
+    monkeypatch.setattr(answer_service, "logger", spy)
+
+    answer_service.submit_answer("fresh", "user", "User", "Answer")
+
+    assert "stale" not in answer_service._sessions
+    assert any("Evicting stale session" in message for message in spy.messages)

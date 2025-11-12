@@ -159,3 +159,28 @@ def test_session_json_format(tmp_path):
     assert data["guild_id"] == guild_id
 
 
+def test_save_session_cleans_temp_on_failure(tmp_path, monkeypatch):
+    """Temp files are removed if the final rename fails."""
+
+    storage_service.DATA_DIR = tmp_path
+    guild_id = "guild"
+    session = TriviaSession(guild_id=guild_id)
+
+    class _ReplaceError(Exception):
+        pass
+
+    original_replace = Path.replace
+
+    def _patched_replace(self, target):
+        if self.suffix == ".tmp":
+            raise _ReplaceError("rename failed")
+        return original_replace(self, target)
+
+    monkeypatch.setattr(Path, "replace", _patched_replace)
+
+    with pytest.raises(_ReplaceError):
+        storage_service.save_session_to_disk(guild_id, session)
+
+    assert not any(tmp_path.glob("*.tmp"))
+
+
