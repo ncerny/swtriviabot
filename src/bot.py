@@ -68,6 +68,23 @@ async def log_resource_stats_periodically() -> None:
     
     while not client.is_closed():
         try:
+            # Log GC stats before collection
+            gc_stats_before = gc.get_count()
+            mem_before = monitor.get_memory_usage()
+            
+            # Force garbage collection across all generations
+            collected = gc.collect(generation=2)  # Full collection
+            
+            # Log GC results
+            mem_after = monitor.get_memory_usage()
+            mem_freed = mem_before['rss_mb'] - mem_after['rss_mb']
+            
+            logger.info(
+                f"GC: freed {collected} objects, "
+                f"memory delta: {mem_freed:+.2f}MB, "
+                f"generations before: {gc_stats_before}"
+            )
+            
             # Log cache sizes for debugging
             logger.info(
                 f"Discord cache sizes: "
@@ -77,10 +94,6 @@ async def log_resource_stats_periodically() -> None:
             
             monitor.log_stats("periodic check")
             monitor.check_memory_threshold(warning_mb=100.0, critical_mb=120.0)
-            
-            # Force garbage collection to free unused memory
-            collected = gc.collect()
-            logger.debug(f"Garbage collection freed {collected} objects")
         except Exception as e:
             logger.error(f"Error logging resource stats: {e}", exc_info=True)
         
