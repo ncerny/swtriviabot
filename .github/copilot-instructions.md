@@ -1,5 +1,6 @@
 ## General Instructions
 
+- You MUST always read `AGENTS.md` in the root command before doing anything else.
 - Follow the project's constitutional principles as outlined in `.specify/memory/constitution.md`.
 - Ensure all code changes are covered by appropriate automated tests.
 - Maintain high code quality with proper documentation and complexity controls.
