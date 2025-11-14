@@ -48,7 +48,8 @@ if not DISCORD_BOT_TOKEN:
 # Use minimal intents to reduce memory usage from Discord's internal caches
 intents = discord.Intents.none()
 intents.guilds = True  # Required for guild context
-intents.message_content = True  # Required for wait_for('message') in image attachment
+intents.guild_messages = True  # Required for message events (wait_for)
+intents.message_content = True  # Required for message.content access
 
 client = discord.Client(intents=intents)
 tree = app_commands.CommandTree(client)
