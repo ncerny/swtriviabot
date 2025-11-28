@@ -1,19 +1,24 @@
 """Unit tests for answer_service module."""
 
 import pytest
-from datetime import datetime, timedelta, timezone
+from unittest.mock import patch, MagicMock
+from datetime import datetime, timezone
 
 from src.services import answer_service
 from src.models.answer import Answer
 from src.models.session import TriviaSession
 
 
-def test_submit_answer_creates_new_session():
+@patch('src.services.answer_service.storage_service')
+def test_submit_answer_creates_new_session(mock_storage):
     """Test that submitting an answer creates a new session if none exists."""
     guild_id = "test_guild_123"
     user_id = "user_456"
     username = "TestUser"
     text = "Test answer"
+    
+    # Mock storage to return None (no existing session)
+    mock_storage.load_session_from_disk.return_value = None
     
     answer, is_update = answer_service.submit_answer(guild_id, user_id, username, text)
     
@@ -21,27 +26,39 @@ def test_submit_answer_creates_new_session():
     assert answer.username == username
     assert answer.text == text
     assert not is_update
-    assert guild_id in answer_service._sessions
+    
+    # Verify session was saved
+    mock_storage.save_session_to_disk.assert_called_once()
 
 
-def test_submit_answer_updates_existing_answer():
+@patch('src.services.answer_service.storage_service')
+def test_submit_answer_updates_existing_answer(mock_storage):
     """Test that submitting a second answer updates the first."""
     guild_id = "test_guild_123"
     user_id = "user_456"
     username = "TestUser"
     
-    # First submission
-    answer1, is_update1 = answer_service.submit_answer(guild_id, user_id, username, "First answer")
-    assert not is_update1
+    # Create existing session with an answer
+    existing_session = TriviaSession(guild_id=guild_id)
+    existing_session.add_or_update_answer(Answer(
+        user_id=user_id,
+        username=username,
+        text="First answer",
+        timestamp=datetime.now(timezone.utc),
+    ))
     
-    # Second submission (update)
-    answer2, is_update2 = answer_service.submit_answer(guild_id, user_id, username, "Second answer")
-    assert is_update2
-    assert answer2.text == "Second answer"
-    assert answer2.is_updated
+    mock_storage.load_session_from_disk.return_value = existing_session
+    
+    # Submit updated answer
+    answer, is_update = answer_service.submit_answer(guild_id, user_id, username, "Second answer")
+    
+    assert is_update
+    assert answer.text == "Second answer"
+    assert answer.is_updated
 
 
-def test_submit_answer_validates_text():
+@patch('src.services.answer_service.storage_service')
+def test_submit_answer_validates_text(mock_storage):
     """Test that empty text raises ValueError."""
     guild_id = "test_guild_123"
     user_id = "user_456"
@@ -51,45 +68,40 @@ def test_submit_answer_validates_text():
         answer_service.submit_answer(guild_id, user_id, username, "   ")
 
 
-def test_get_session_returns_none_for_nonexistent():
+@patch('src.services.answer_service.storage_service')
+def test_get_session_returns_none_for_nonexistent(mock_storage):
     """Test that get_session returns None for non-existent guild."""
+    mock_storage.load_session_from_disk.return_value = None
+    
     session = answer_service.get_session("nonexistent_guild")
     assert session is None
 
 
-def test_get_session_returns_existing_session():
+@patch('src.services.answer_service.storage_service')
+def test_get_session_returns_existing_session(mock_storage):
     """Test that get_session returns an existing session."""
     guild_id = "test_guild_123"
     
-    # Create session by submitting an answer
-    answer_service.submit_answer(guild_id, "user_123", "TestUser", "Test answer")
+    existing_session = TriviaSession(guild_id=guild_id)
+    mock_storage.load_session_from_disk.return_value = existing_session
     
     session = answer_service.get_session(guild_id)
     assert session is not None
     assert session.guild_id == guild_id
-    assert len(session.answers) == 1
 
 
-def test_reset_session_clears_answers():
-    """Test that reset_session removes the session."""
+@patch('src.services.answer_service.storage_service')
+def test_reset_session_deletes_from_storage(mock_storage):
+    """Test that reset_session deletes the session from storage."""
     guild_id = "test_guild_123"
     
-    # Create session
-    answer_service.submit_answer(guild_id, "user_123", "TestUser", "Test answer")
-    assert guild_id in answer_service._sessions
-    
-    # Reset
     answer_service.reset_session(guild_id)
-    assert guild_id not in answer_service._sessions
+    
+    mock_storage.delete_session_file.assert_called_once_with(guild_id)
 
 
-def test_reset_session_handles_nonexistent_guild():
-    """Test that resetting a non-existent session doesn't raise an error."""
-    answer_service.reset_session("nonexistent_guild")
-    # Should not raise any exception
-
-
-def test_create_session():
+@patch('src.services.answer_service.storage_service')
+def test_create_session(mock_storage):
     """Test that create_session creates an empty session."""
     guild_id = "test_guild_123"
     
@@ -97,80 +109,59 @@ def test_create_session():
     
     assert session.guild_id == guild_id
     assert len(session.answers) == 0
-    assert guild_id in answer_service._sessions
 
 
-def test_get_all_sessions():
-    """Test that get_all_sessions returns all active sessions."""
-    # Create multiple sessions
-    answer_service.submit_answer("guild_1", "user_1", "User1", "Answer1")
-    answer_service.submit_answer("guild_2", "user_2", "User2", "Answer2")
-    
-    all_sessions = answer_service.get_all_sessions()
-    
-    assert len(all_sessions) == 2
-    assert "guild_1" in all_sessions
-    assert "guild_2" in all_sessions
-
-
-def test_load_sessions():
-    """Test that load_sessions replaces current sessions."""
-    # Create initial session
-    answer_service.submit_answer("guild_1", "user_1", "User1", "Answer1")
-    
-    # Create new sessions to load
-    new_sessions = {
-        "guild_2": TriviaSession(guild_id="guild_2"),
-        "guild_3": TriviaSession(guild_id="guild_3"),
-    }
-    
-    answer_service.load_sessions(new_sessions)
-    
-    all_sessions = answer_service.get_all_sessions()
-    assert "guild_1" not in all_sessions
-    assert "guild_2" in all_sessions
-    assert "guild_3" in all_sessions
-
-
-def test_multiple_users_same_guild():
+@patch('src.services.answer_service.storage_service')
+def test_multiple_users_same_guild(mock_storage):
     """Test that multiple users can submit answers to the same guild."""
     guild_id = "test_guild_123"
     
+    # Start with empty session
+    session = TriviaSession(guild_id=guild_id)
+    
+    def load_session_side_effect(gid):
+        return session if gid == guild_id else None
+    
+    mock_storage.load_session_from_disk.side_effect = load_session_side_effect
+    
+    # Submit answers from different users
     answer_service.submit_answer(guild_id, "user_1", "User1", "Answer1")
     answer_service.submit_answer(guild_id, "user_2", "User2", "Answer2")
     answer_service.submit_answer(guild_id, "user_3", "User3", "Answer3")
     
-    session = answer_service.get_session(guild_id)
-    assert session is not None
+    # Verify all answers were added to session
     assert len(session.answers) == 3
     assert "user_1" in session.answers
     assert "user_2" in session.answers
     assert "user_3" in session.answers
 
 
-def test_submit_answer_evicts_stale_sessions(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Old sessions beyond TTL are removed before processing."""
+@patch('src.services.answer_service.storage_service')
+def test_submit_answer_with_long_text(mock_storage):
+    """Test submitting answer with very long text."""
+    guild_id = "test_guild_123"
+    user_id = "user_456"
+    username = "TestUser"
+    long_text = "A" * 3000  # Long but under 4000 char limit
+    
+    mock_storage.load_session_from_disk.return_value = None
+    
+    answer, is_update = answer_service.submit_answer(guild_id, user_id, username, long_text)
+    
+    assert answer.text == long_text
+    assert not is_update
 
-    now = datetime.now(timezone.utc)
-    stale = TriviaSession(
-        guild_id="stale",
-        created_at=now - timedelta(days=8),
-        last_activity=now - timedelta(days=8),
-    )
 
-    monkeypatch.setattr(answer_service, "_sessions", {"stale": stale})
-
-    class _Spy:
-        def __init__(self) -> None:
-            self.messages: list[str] = []
-
-        def warning(self, message: str) -> None:
-            self.messages.append(message)
-
-    spy = _Spy()
-    monkeypatch.setattr(answer_service, "logger", spy)
-
-    answer_service.submit_answer("fresh", "user", "User", "Answer")
-
-    assert "stale" not in answer_service._sessions
-    assert any("Evicting stale session" in message for message in spy.messages)
+@patch('src.services.answer_service.storage_service')
+def test_submit_answer_saves_to_storage(mock_storage):
+    """Test that submitting an answer saves the session to storage."""
+    guild_id = "test_guild_123"
+    mock_storage.load_session_from_disk.return_value = None
+    
+    answer_service.submit_answer(guild_id, "user_123", "TestUser", "Test answer")
+    
+    # Verify save was called
+    assert mock_storage.save_session_to_disk.called
+    call_args = mock_storage.save_session_to_disk.call_args
+    assert call_args[0][0] == guild_id
+    assert isinstance(call_args[0][1], TriviaSession)

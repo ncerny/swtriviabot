@@ -1,8 +1,14 @@
 """Pytest configuration and shared fixtures."""
 
+import sys
+from pathlib import Path
+
+# Add src to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 import pytest
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import discord
 from discord import app_commands
@@ -94,33 +100,46 @@ def sample_session_data():
 
 
 @pytest.fixture(autouse=True)
-def reset_answer_service():
-    """Reset answer service state between tests."""
-    from src.services import answer_service
-    
-    # Store original state
-    original_sessions = answer_service._sessions.copy()
-    
-    # Clear state for test
-    answer_service._sessions.clear()
-    
-    yield
-    
-    # Restore original state
-    answer_service._sessions = original_sessions
+def mock_firestore():
+    """Mock Firestore for all tests."""
+    with patch('src.services.storage_service._get_db') as mock_db:
+        # Create mock Firestore client
+        mock_client = MagicMock()
+        mock_collection = MagicMock()
+        mock_document = MagicMock()
+        
+        # Setup chain: db.collection().document()
+        mock_client.collection.return_value = mock_collection
+        mock_collection.document.return_value = mock_document
+        mock_collection.stream.return_value = []
+        
+        # Mock document operations
+        mock_doc_snapshot = MagicMock()
+        mock_doc_snapshot.exists = False
+        mock_doc_snapshot.to_dict.return_value = {}
+        mock_document.get.return_value = mock_doc_snapshot
+        mock_document.set = MagicMock()
+        mock_document.delete = MagicMock()
+        
+        mock_db.return_value = mock_client
+        
+        yield {
+            'db': mock_client,
+            'collection': mock_collection,
+            'document': mock_document,
+            'snapshot': mock_doc_snapshot,
+        }
 
 
 @pytest.fixture(autouse=True)
-def cleanup_test_files(tmp_path):
-    """Ensure test data files are cleaned up."""
-    import os
+def reset_storage_service():
+    """Reset storage service state between tests."""
     from src.services import storage_service
     
-    # Temporarily override data directory for tests
-    original_data_dir = storage_service.DATA_DIR
-    storage_service.DATA_DIR = tmp_path
+    # Reset the database connection
+    storage_service._db = None
     
     yield
     
-    # Restore original directory
-    storage_service.DATA_DIR = original_data_dir
+    # Clean up
+    storage_service._db = None
