@@ -20,6 +20,18 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+# Load environment variables from .env file in project root
+# CRITICAL: Load this BEFORE importing any services that read env vars
+env_path = Path(__file__).parent.parent / ".env"
+load_dotenv(dotenv_path=env_path)
+
+# Verify .env was loaded (for debugging)
+import os
+_dev_mode_check = os.getenv("DEV_MODE", "not_set")
+print(f"[STARTUP] .env file path: {env_path}")
+print(f"[STARTUP] .env file exists: {env_path.exists()}")
+print(f"[STARTUP] DEV_MODE from environment: '{_dev_mode_check}'")
+
 from src.services import answer_service, storage_service
 from src.commands.list_answers import list_answers_command
 from src.commands.post_question import post_question_command, AnswerButton
@@ -34,14 +46,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Load environment variables
-load_dotenv()
-
-# Bot configuration
+# Bot configuration - read after .env is loaded
 DISCORD_BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 DISCORD_TEST_GUILD_ID = os.getenv("DISCORD_TEST_GUILD_ID")
 BOT_INSTANCE_ID = os.getenv("BOT_INSTANCE_ID", str(uuid.uuid4()))
 DEV_MODE = os.getenv("DEV_MODE", "false").lower() == "true"
+
 
 if not DISCORD_BOT_TOKEN:
     logger.error("DISCORD_BOT_TOKEN not found in environment variables")

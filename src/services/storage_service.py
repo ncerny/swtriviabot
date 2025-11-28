@@ -18,10 +18,15 @@ DATA_DIR = Path(__file__).parent.parent.parent / "data"
 
 # Environment-based collection suffix
 # If DEV_MODE=true, append '-test' to collection names for isolation
-DEV_MODE = os.getenv("DEV_MODE", "false").lower() == "true"
+_dev_mode_raw = os.getenv("DEV_MODE", "false")
+DEV_MODE = _dev_mode_raw.lower() == "true"
 COLLECTION_SUFFIX = "-test" if DEV_MODE else ""
 
-logger.info(f"Storage service initialized with DEV_MODE={DEV_MODE}, collection suffix='{COLLECTION_SUFFIX}'")
+logger.info(f"Storage service initializing...")
+logger.info(f"  DEV_MODE environment variable (raw): '{_dev_mode_raw}'")
+logger.info(f"  DEV_MODE parsed as boolean: {DEV_MODE}")
+logger.info(f"  Collection suffix: '{COLLECTION_SUFFIX}'")
+
 
 # Initialize Firebase
 _db = None
