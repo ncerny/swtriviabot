@@ -41,6 +41,7 @@ load_dotenv()
 DISCORD_BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 DISCORD_TEST_GUILD_ID = os.getenv("DISCORD_TEST_GUILD_ID")
 BOT_INSTANCE_ID = os.getenv("BOT_INSTANCE_ID", str(uuid.uuid4()))
+DEV_MODE = os.getenv("DEV_MODE", "false").lower() == "true"
 
 if not DISCORD_BOT_TOKEN:
     logger.error("DISCORD_BOT_TOKEN not found in environment variables")
@@ -79,8 +80,10 @@ def acquire_lock() -> bool:
 
     # Use the same collection suffix as storage_service for isolation
     from src.services.storage_service import COLLECTION_SUFFIX
-    lock_ref = db.collection(f"bot_status{COLLECTION_SUFFIX}").document("leader")
-
+    collection_name = f"bot_status{COLLECTION_SUFFIX}"
+    lock_ref = db.collection(collection_name).document("leader")
+    
+    logger.debug(f"Attempting to acquire lock from collection: {collection_name}")
     
     try:
         from firebase_admin import firestore
@@ -226,7 +229,13 @@ signal.signal(signal.SIGINT, graceful_shutdown)
 
 def main() -> None:
     """Main entry point."""
+    from src.services.storage_service import COLLECTION_SUFFIX, DEV_MODE as STORAGE_DEV_MODE
+    
+    mode_str = "TEST/DEV" if STORAGE_DEV_MODE else "PRODUCTION"
     logger.info(f"Starting Discord Trivia Bot (Instance: {BOT_INSTANCE_ID})")
+    logger.info(f"🔧 Running in {mode_str} mode (DEV_MODE={STORAGE_DEV_MODE})")
+    logger.info(f"📦 Using collection suffix: '{COLLECTION_SUFFIX}'")
+    logger.info(f"📊 Collections: sessions{COLLECTION_SUFFIX}, bot_status{COLLECTION_SUFFIX}")
     
     # 1. Migrate local data if any
     try:
