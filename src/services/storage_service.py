@@ -16,6 +16,13 @@ logger = logging.getLogger(__name__)
 # Data directory for legacy local storage (for migration)
 DATA_DIR = Path(__file__).parent.parent.parent / "data"
 
+# Environment-based collection suffix
+# If DEV_MODE=true, append '-test' to collection names for isolation
+DEV_MODE = os.getenv("DEV_MODE", "false").lower() == "true"
+COLLECTION_SUFFIX = "-test" if DEV_MODE else ""
+
+logger.info(f"Storage service initialized with DEV_MODE={DEV_MODE}, collection suffix='{COLLECTION_SUFFIX}'")
+
 # Initialize Firebase
 _db = None
 
@@ -56,7 +63,7 @@ def load_session_from_disk(guild_id: str) -> Optional[TriviaSession]:
         return None
 
     try:
-        doc_ref = db.collection("sessions").document(str(guild_id))
+        doc_ref = db.collection(f"sessions{COLLECTION_SUFFIX}").document(str(guild_id))
         doc = doc_ref.get()
         
         if doc.exists:
@@ -82,7 +89,7 @@ def save_session_to_disk(guild_id: str, session: TriviaSession) -> None:
         return
 
     try:
-        doc_ref = db.collection("sessions").document(str(guild_id))
+        doc_ref = db.collection(f"sessions{COLLECTION_SUFFIX}").document(str(guild_id))
         doc_ref.set(session.to_dict())
     except Exception as e:
         logger.error(f"Error saving session for guild {guild_id}: {e}")
@@ -100,7 +107,7 @@ def delete_session_file(guild_id: str) -> None:
         return
 
     try:
-        db.collection("sessions").document(str(guild_id)).delete()
+        db.collection(f"sessions{COLLECTION_SUFFIX}").document(str(guild_id)).delete()
     except Exception as e:
         logger.error(f"Error deleting session for guild {guild_id}: {e}")
 
@@ -117,7 +124,7 @@ def load_all_sessions() -> dict[str, TriviaSession]:
 
     sessions = {}
     try:
-        docs = db.collection("sessions").stream()
+        docs = db.collection(f"sessions{COLLECTION_SUFFIX}").stream()
         for doc in docs:
             data = doc.to_dict()
             data["guild_id"] = doc.id

@@ -77,7 +77,10 @@ def acquire_lock() -> bool:
     if not db:
         return False
 
-    lock_ref = db.collection("bot_status").document("leader")
+    # Use the same collection suffix as storage_service for isolation
+    from src.services.storage_service import COLLECTION_SUFFIX
+    lock_ref = db.collection(f"bot_status{COLLECTION_SUFFIX}").document("leader")
+
     
     try:
         from firebase_admin import firestore
@@ -131,7 +134,8 @@ def release_lock() -> None:
         return
 
     try:
-        lock_ref = db.collection("bot_status").document("leader")
+        from src.services.storage_service import COLLECTION_SUFFIX
+        lock_ref = db.collection(f"bot_status{COLLECTION_SUFFIX}").document("leader")
         # Only delete if we are the owner
         doc = lock_ref.get()
         if doc.exists and doc.to_dict().get("instance_id") == BOT_INSTANCE_ID:
