@@ -126,46 +126,54 @@ async def test_post_question_modal_checks_embed_permission(mock_interaction, moc
 
 
 @pytest.mark.asyncio
-async def test_post_question_modal_submit_with_previous_answers(mock_interaction, mock_channel, tmp_path):
+async def test_post_question_modal_submit_with_previous_answers(mock_interaction, mock_channel):
     """Test posting question with previous answers."""
-    storage_service.DATA_DIR = tmp_path
     guild_id = str(mock_interaction.guild_id)
     
-    # Create previous session with answers
-    answer_service.submit_answer(guild_id, "user1", "User1", "Previous answer 1")
-    answer_service.submit_answer(guild_id, "user2", "User2", "Previous answer 2")
-    
-    # Create modal and mock the TextInput values
-    modal = PostQuestionModal(guild_id=guild_id, channel=mock_channel)
-    
-    # Mock the TextInput attributes to have values
-    modal.yesterday_answer = Mock()
-    modal.yesterday_answer.value = "Coffee Ice Cream"
-    modal.yesterday_winners = Mock()
-    modal.yesterday_winners.value = "Player1, Player2"
-    modal.todays_question = Mock()
-    modal.todays_question.value = "What is the capital of France?"
+    with patch('src.services.answer_service.storage_service') as mock_storage:
+        # Create previous session
+        from src.models.session import TriviaSession
+        session = TriviaSession(guild_id=guild_id)
+        
+        # Mock storage to return the session when loading
+        mock_storage.load_session.return_value = session
+        
+        # Now submit answers (which will use the mocked session)
+        answer_service.submit_answer(guild_id, "user1", "User1", "Previous answer 1")
+        answer_service.submit_answer(guild_id, "user2", "User2", "Previous answer 2")
+        
+        # Create modal and mock the TextInput values
+        modal = PostQuestionModal(guild_id=guild_id, channel=mock_channel)
+        
+        # Mock the TextInput attributes to have values
+        modal.yesterday_answer = Mock()
+        modal.yesterday_answer.value = "Coffee Ice Cream"
+        modal.yesterday_winners = Mock()
+        modal.yesterday_winners.value = "Player1, Player2"
+        modal.todays_question = Mock()
+        modal.todays_question.value = "What is the capital of France?"
 
-    # Mock image attachment waiting to return None (no image)
-    with patch.object(modal, '_wait_for_image_attachment', return_value=None):
-        await modal.on_submit(mock_interaction)
-    
-    # Verify session was reset
-    session = answer_service.get_session(guild_id)
-    assert session is not None
-    assert len(session.answers) == 0  # New session, no answers yet
-    
-    # Verify question was posted to channel
-    mock_channel.send.assert_called_once()
-    call_args = mock_channel.send.call_args
-    assert "content" in call_args[1]
-    assert "view" in call_args[1]
-    
-    # Verify admin received previous answers
-    followup_call = mock_interaction.followup.send.call_args
-    assert "Previous Session Answers" in followup_call[0][0]
-    assert "User1" in followup_call[0][0]
-    assert "User2" in followup_call[0][0]
+        # Mock image attachment waiting to return None (no image)
+        with patch.object(modal, '_wait_for_image_attachment', return_value=None):
+            await modal.on_submit(mock_interaction)
+        
+        # Verify session was reset (delete was called)
+        mock_storage.delete_session.assert_called_once_with(guild_id)
+        
+        # Verify new session was created (save was called)
+        assert mock_storage.save_session.called
+        
+        # Verify question was posted to channel
+        mock_channel.send.assert_called_once()
+        call_args = mock_channel.send.call_args
+        assert "content" in call_args[1]
+        assert "view" in call_args[1]
+        
+        # Verify admin received previous answers
+        followup_call = mock_interaction.followup.send.call_args
+        assert "Previous Session Answers" in followup_call[0][0]
+        assert "User1" in followup_call[0][0]
+        assert "User2" in followup_call[0][0]
 
 
 @pytest.mark.asyncio
@@ -225,67 +233,72 @@ async def test_post_question_modal_no_winners_message(mock_interaction, mock_cha
 
 
 @pytest.mark.asyncio
-async def test_answer_modal_submit_new_answer(mock_interaction, tmp_path):
+async def test_answer_modal_submit_new_answer(mock_interaction):
     """Test submitting a new answer via modal."""
-    storage_service.DATA_DIR = tmp_path
     guild_id = "123456789"
     user_id = "987654321"
     username = "TestUser"
     
-    # Create session
-    answer_service.create_session(guild_id)
-    
-    # Create and submit modal
-    modal = AnswerModal(guild_id=guild_id, user_id=user_id, username=username)
-    modal.answer_text = Mock()
-    modal.answer_text.value = "Paris"
-    
-    await modal.on_submit(mock_interaction)
-    
-    # Verify response was deferred
-    mock_interaction.response.defer.assert_called_once_with(ephemeral=True)
-    
-    # Verify answer was recorded
-    session = answer_service.get_session(guild_id)
-    assert user_id in session.answers
-    assert session.answers[user_id].text == "Paris"
-    
-    # Verify success message via followup
-    call_args = mock_interaction.followup.send.call_args
-    assert "✅" in call_args[0][0]
-    assert "recorded" in call_args[0][0]
+    with patch('src.services.answer_service.storage_service') as mock_storage:
+        # Create session
+        from src.models.session import TriviaSession
+        session = TriviaSession(guild_id=guild_id)
+        mock_storage.load_session.return_value = session
+        
+        # Create and submit modal
+        modal = AnswerModal(guild_id=guild_id, user_id=user_id, username=username)
+        modal.answer_text = Mock()
+        modal.answer_text.value = "Paris"
+        
+        await modal.on_submit(mock_interaction)
+        
+        # Verify response was deferred
+        mock_interaction.response.defer.assert_called_once_with(ephemeral=True)
+        
+        # Verify answer was saved to storage
+        assert mock_storage.save_session.called
+        
+        # Verify success message via followup
+        call_args = mock_interaction.followup.send.call_args
+        assert "✅" in call_args[0][0]
+        assert "recorded" in call_args[0][0]
 
 
 @pytest.mark.asyncio
-async def test_answer_modal_update_existing_answer(mock_interaction, tmp_path):
+async def test_answer_modal_update_existing_answer(mock_interaction):
     """Test updating an existing answer via modal."""
-    storage_service.DATA_DIR = tmp_path
     guild_id = "123456789"
     user_id = "987654321"
     username = "TestUser"
     
-    # Create session and initial answer
-    answer_service.create_session(guild_id)
-    answer_service.submit_answer(guild_id, user_id, username, "First answer")
-    
-    # Update with modal
-    modal = AnswerModal(guild_id=guild_id, user_id=user_id, username=username)
-    modal.answer_text = Mock()
-    modal.answer_text.value = "Updated answer"
-    
-    await modal.on_submit(mock_interaction)
-    
-    # Verify response was deferred
-    mock_interaction.response.defer.assert_called_once_with(ephemeral=True)
-    
-    # Verify answer was updated
-    session = answer_service.get_session(guild_id)
-    assert session.answers[user_id].text == "Updated answer"
-    
-    # Verify update message via followup
-    call_args = mock_interaction.followup.send.call_args
-    assert "🔄" in call_args[0][0]
-    assert "updating" in call_args[0][0].lower()
+    with patch('src.services.answer_service.storage_service') as mock_storage:
+        # Create session
+        from src.models.session import TriviaSession
+        session = TriviaSession(guild_id=guild_id)
+        
+        # Mock storage to return the session when loading
+        mock_storage.load_session.return_value = session
+        
+        # Submit initial answer (which will use the mocked session)
+        answer_service.submit_answer(guild_id, user_id, username, "First answer")
+        
+        # Update with modal
+        modal = AnswerModal(guild_id=guild_id, user_id=user_id, username=username)
+        modal.answer_text = Mock()
+        modal.answer_text.value = "Updated answer"
+        
+        await modal.on_submit(mock_interaction)
+        
+        # Verify response was deferred
+        mock_interaction.response.defer.assert_called_once_with(ephemeral=True)
+        
+        # Verify answer was saved
+        assert mock_storage.save_session.called
+        
+        # Verify update message via followup
+        call_args = mock_interaction.followup.send.call_args
+        assert "🔄" in call_args[0][0]
+        assert "updating" in call_args[0][0].lower()
 
 
 @pytest.mark.asyncio

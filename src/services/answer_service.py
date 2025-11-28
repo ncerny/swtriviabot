@@ -48,7 +48,7 @@ def submit_answer(guild_id: str, user_id: str, username: str, text: str) -> tupl
     sanitized_text = validate_answer_text(text)
 
     # Get or create session for this guild
-    session = storage_service.load_session_from_disk(guild_id)
+    session = storage_service.load_session(guild_id)
     if not session:
         session = TriviaSession(guild_id=guild_id)
 
@@ -64,7 +64,7 @@ def submit_answer(guild_id: str, user_id: str, username: str, text: str) -> tupl
     is_update = session.add_or_update_answer(answer)
 
     # Persist to Firestore
-    storage_service.save_session_to_disk(guild_id, session)
+    storage_service.save_session(guild_id, session)
 
     return answer, is_update
 
@@ -78,7 +78,7 @@ def get_session(guild_id: str) -> Optional[TriviaSession]:
     Returns:
         TriviaSession if exists, None otherwise
     """
-    return storage_service.load_session_from_disk(guild_id)
+    return storage_service.load_session(guild_id)
 
 
 def reset_session(guild_id: str) -> None:
@@ -91,7 +91,7 @@ def reset_session(guild_id: str) -> None:
     # Clearing answers keeps the session object alive (preserves created_at potentially).
     # But usually reset means "start over".
     # Let's delete the file/doc to be consistent with previous behavior.
-    storage_service.delete_session_file(guild_id)
+    storage_service.delete_session(guild_id)
 
 
 def create_session(guild_id: str) -> TriviaSession:
@@ -104,7 +104,7 @@ def create_session(guild_id: str) -> TriviaSession:
         The newly created TriviaSession
     """
     session = TriviaSession(guild_id=guild_id)
-    storage_service.save_session_to_disk(guild_id, session)
+    storage_service.save_session(guild_id, session)
     return session
 
 

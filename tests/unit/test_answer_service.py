@@ -18,7 +18,7 @@ def test_submit_answer_creates_new_session(mock_storage):
     text = "Test answer"
     
     # Mock storage to return None (no existing session)
-    mock_storage.load_session_from_disk.return_value = None
+    mock_storage.load_session.return_value = None
     
     answer, is_update = answer_service.submit_answer(guild_id, user_id, username, text)
     
@@ -28,7 +28,7 @@ def test_submit_answer_creates_new_session(mock_storage):
     assert not is_update
     
     # Verify session was saved
-    mock_storage.save_session_to_disk.assert_called_once()
+    mock_storage.save_session.assert_called_once()
 
 
 @patch('src.services.answer_service.storage_service')
@@ -47,7 +47,7 @@ def test_submit_answer_updates_existing_answer(mock_storage):
         timestamp=datetime.now(timezone.utc),
     ))
     
-    mock_storage.load_session_from_disk.return_value = existing_session
+    mock_storage.load_session.return_value = existing_session
     
     # Submit updated answer
     answer, is_update = answer_service.submit_answer(guild_id, user_id, username, "Second answer")
@@ -71,7 +71,7 @@ def test_submit_answer_validates_text(mock_storage):
 @patch('src.services.answer_service.storage_service')
 def test_get_session_returns_none_for_nonexistent(mock_storage):
     """Test that get_session returns None for non-existent guild."""
-    mock_storage.load_session_from_disk.return_value = None
+    mock_storage.load_session.return_value = None
     
     session = answer_service.get_session("nonexistent_guild")
     assert session is None
@@ -83,7 +83,7 @@ def test_get_session_returns_existing_session(mock_storage):
     guild_id = "test_guild_123"
     
     existing_session = TriviaSession(guild_id=guild_id)
-    mock_storage.load_session_from_disk.return_value = existing_session
+    mock_storage.load_session.return_value = existing_session
     
     session = answer_service.get_session(guild_id)
     assert session is not None
@@ -97,7 +97,7 @@ def test_reset_session_deletes_from_storage(mock_storage):
     
     answer_service.reset_session(guild_id)
     
-    mock_storage.delete_session_file.assert_called_once_with(guild_id)
+    mock_storage.delete_session.assert_called_once_with(guild_id)
 
 
 @patch('src.services.answer_service.storage_service')
@@ -122,7 +122,7 @@ def test_multiple_users_same_guild(mock_storage):
     def load_session_side_effect(gid):
         return session if gid == guild_id else None
     
-    mock_storage.load_session_from_disk.side_effect = load_session_side_effect
+    mock_storage.load_session.side_effect = load_session_side_effect
     
     # Submit answers from different users
     answer_service.submit_answer(guild_id, "user_1", "User1", "Answer1")
@@ -144,7 +144,7 @@ def test_submit_answer_with_long_text(mock_storage):
     username = "TestUser"
     long_text = "A" * 3000  # Long but under 4000 char limit
     
-    mock_storage.load_session_from_disk.return_value = None
+    mock_storage.load_session.return_value = None
     
     answer, is_update = answer_service.submit_answer(guild_id, user_id, username, long_text)
     
@@ -156,12 +156,12 @@ def test_submit_answer_with_long_text(mock_storage):
 def test_submit_answer_saves_to_storage(mock_storage):
     """Test that submitting an answer saves the session to storage."""
     guild_id = "test_guild_123"
-    mock_storage.load_session_from_disk.return_value = None
+    mock_storage.load_session.return_value = None
     
     answer_service.submit_answer(guild_id, "user_123", "TestUser", "Test answer")
     
     # Verify save was called
-    assert mock_storage.save_session_to_disk.called
-    call_args = mock_storage.save_session_to_disk.call_args
+    assert mock_storage.save_session.called
+    call_args = mock_storage.save_session.call_args
     assert call_args[0][0] == guild_id
     assert isinstance(call_args[0][1], TriviaSession)

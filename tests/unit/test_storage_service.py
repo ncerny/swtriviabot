@@ -20,7 +20,7 @@ def test_save_session_to_firestore(mock_firestore):
         timestamp=datetime.now(timezone.utc),
     ))
     
-    storage_service.save_session_to_disk(guild_id, session)
+    storage_service.save_session(guild_id, session)
     
     # Verify Firestore was called correctly
     mock_firestore['collection'].document.assert_called_with(str(guild_id))
@@ -40,7 +40,7 @@ def test_load_session_from_firestore(mock_firestore):
         "last_activity": datetime.now(timezone.utc).isoformat(),
     }
     
-    session = storage_service.load_session_from_disk(guild_id)
+    session = storage_service.load_session(guild_id)
     
     assert session is not None
     assert session.guild_id == guild_id
@@ -51,7 +51,7 @@ def test_load_nonexistent_session(mock_firestore):
     """Test loading a session that doesn't exist."""
     mock_firestore['snapshot'].exists = False
     
-    session = storage_service.load_session_from_disk("nonexistent_guild")
+    session = storage_service.load_session("nonexistent_guild")
     assert session is None
 
 
@@ -59,7 +59,7 @@ def test_delete_session_from_firestore(mock_firestore):
     """Test deleting a session from Firestore."""
     guild_id = "test_guild_123"
     
-    storage_service.delete_session_file(guild_id)
+    storage_service.delete_session(guild_id)
     
     mock_firestore['collection'].document.assert_called_with(str(guild_id))
     mock_firestore['document'].delete.assert_called_once()
@@ -129,7 +129,7 @@ def test_migrate_local_data_migrates_json_files(mock_get_db, mock_data_dir, tmp_
     mock_data_dir.glob.return_value = [test_file]
     
     # Run migration
-    with patch('src.services.storage_service.save_session_to_disk') as mock_save:
+    with patch('src.services.storage_service.save_session') as mock_save:
         storage_service.migrate_local_data()
         
         # Verify save was called
@@ -154,7 +154,7 @@ def test_save_session_handles_none_db(mock_get_db):
     session = TriviaSession(guild_id=guild_id)
     
     # Should not raise an error
-    storage_service.save_session_to_disk(guild_id, session)
+    storage_service.save_session(guild_id, session)
 
 
 @patch('src.services.storage_service._get_db')
@@ -162,7 +162,7 @@ def test_load_session_handles_none_db(mock_get_db):
     """Test that load_session handles None database gracefully."""
     mock_get_db.return_value = None
     
-    session = storage_service.load_session_from_disk("test_guild")
+    session = storage_service.load_session("test_guild")
     assert session is None
 
 
@@ -172,7 +172,7 @@ def test_delete_session_handles_none_db(mock_get_db):
     mock_get_db.return_value = None
     
     # Should not raise an error
-    storage_service.delete_session_file("test_guild")
+    storage_service.delete_session("test_guild")
 
 
 @patch('src.services.storage_service._get_db')
@@ -214,14 +214,14 @@ def test_save_session_handles_firestore_error(mock_firestore):
     mock_firestore['document'].set.side_effect = Exception("Firestore error")
     
     with pytest.raises(Exception):
-        storage_service.save_session_to_disk(guild_id, session)
+        storage_service.save_session(guild_id, session)
 
 
 def test_load_session_handles_firestore_error(mock_firestore):
     """Test that load_session handles Firestore errors gracefully."""
     mock_firestore['document'].get.side_effect = Exception("Firestore error")
     
-    session = storage_service.load_session_from_disk("test_guild")
+    session = storage_service.load_session("test_guild")
     assert session is None
 
 
@@ -281,7 +281,7 @@ def test_migrate_local_data_renames_migrated_files(mock_get_db, mock_data_dir, t
     mock_data_dir.exists.return_value = True
     mock_data_dir.glob.return_value = [test_file]
     
-    with patch('src.services.storage_service.save_session_to_disk'):
+    with patch('src.services.storage_service.save_session'):
         storage_service.migrate_local_data()
         
         # Original file should be renamed

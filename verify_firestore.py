@@ -29,11 +29,11 @@ def test_session_storage():
     
     # Create session
     session = TriviaSession(guild_id=guild_id)
-    storage_service.save_session_to_disk(guild_id, session)
+    storage_service.save_session(guild_id, session)
     logger.info("Saved session")
     
     # Load session
-    loaded = storage_service.load_session_from_disk(guild_id)
+    loaded = storage_service.load_session(guild_id)
     if loaded and loaded.guild_id == guild_id:
         logger.info("✅ Loaded session successfully")
     else:
@@ -41,8 +41,8 @@ def test_session_storage():
         sys.exit(1)
         
     # Delete session
-    storage_service.delete_session_file(guild_id)
-    loaded_after = storage_service.load_session_from_disk(guild_id)
+    storage_service.delete_session(guild_id)
+    loaded_after = storage_service.load_session(guild_id)
     if not loaded_after:
         logger.info("✅ Deleted session successfully")
     else:

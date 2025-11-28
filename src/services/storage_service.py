@@ -54,7 +54,7 @@ def _get_db():
     return _db
 
 
-def load_session_from_disk(guild_id: str) -> Optional[TriviaSession]:
+def load_session(guild_id: str) -> Optional[TriviaSession]:
     """Load a session from Firestore.
     
     Args:
@@ -82,7 +82,7 @@ def load_session_from_disk(guild_id: str) -> Optional[TriviaSession]:
         return None
 
 
-def save_session_to_disk(guild_id: str, session: TriviaSession) -> None:
+def save_session(guild_id: str, session: TriviaSession) -> None:
     """Save a session to Firestore.
 
     Args:
@@ -101,7 +101,7 @@ def save_session_to_disk(guild_id: str, session: TriviaSession) -> None:
         raise e
 
 
-def delete_session_file(guild_id: str) -> None:
+def delete_session(guild_id: str) -> None:
     """Delete a session from Firestore.
 
     Args:
@@ -168,7 +168,7 @@ def migrate_local_data() -> None:
                 session = TriviaSession.from_dict(data)
             
             # Save to Firestore
-            save_session_to_disk(guild_id, session)
+            save_session(guild_id, session)
             
             # Rename file to mark as migrated
             file_path.rename(file_path.with_suffix(".json.migrated"))

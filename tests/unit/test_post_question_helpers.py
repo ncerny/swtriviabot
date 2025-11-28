@@ -339,7 +339,7 @@ async def test_post_question_modal_handles_already_responded(mock_interaction, m
 
     watch_mock = AsyncMock()
     monkeypatch.setattr(modal, "_watch_for_image_and_edit", watch_mock)
-    monkeypatch.setattr("src.commands.post_question.storage_service.save_session_to_disk", lambda *args, **kwargs: None)
+    monkeypatch.setattr("src.commands.post_question.storage_service.save_session", lambda *args, **kwargs: None)
 
     await modal.on_submit(mock_interaction)
     await asyncio.sleep(0)
@@ -367,7 +367,7 @@ async def test_post_question_modal_handles_channel_send_error(mock_interaction, 
         field.value = value
         setattr(modal, field_name, field)
 
-    monkeypatch.setattr("src.commands.post_question.storage_service.save_session_to_disk", lambda *args, **kwargs: None)
+    monkeypatch.setattr("src.commands.post_question.storage_service.save_session", lambda *args, **kwargs: None)
     monkeypatch.setattr(modal, "_watch_for_image_and_edit", AsyncMock())
 
     await modal.on_submit(mock_interaction)
@@ -390,7 +390,7 @@ async def test_answer_modal_handles_interaction_responded(mock_interaction, tmp_
     mock_interaction.response.defer.side_effect = discord.errors.InteractionResponded(Mock())
     mock_interaction.followup.send = AsyncMock()
 
-    monkeypatch.setattr("src.commands.post_question.storage_service.save_session_to_disk", lambda *args, **kwargs: None)
+    monkeypatch.setattr("src.commands.post_question.storage_service.save_session", lambda *args, **kwargs: None)
 
     await modal.on_submit(mock_interaction)
 
@@ -409,7 +409,7 @@ async def test_answer_modal_followup_not_found(mock_interaction, tmp_path, monke
     modal.answer_text.value = "Another"
 
     mock_interaction.followup.send = AsyncMock(side_effect=discord.errors.NotFound(Mock(), "expired"))
-    monkeypatch.setattr("src.commands.post_question.storage_service.save_session_to_disk", lambda *args, **kwargs: None)
+    monkeypatch.setattr("src.commands.post_question.storage_service.save_session", lambda *args, **kwargs: None)
 
     await modal.on_submit(mock_interaction)
 

@@ -391,7 +391,7 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
             # Reset session and create new one
             answer_service.reset_session(self.guild_id)
             session = answer_service.create_session(self.guild_id)
-            storage_service.save_session_to_disk(self.guild_id, session)
+            storage_service.save_session(self.guild_id, session)
 
 
 
@@ -496,7 +496,7 @@ class AnswerModal(ui.Modal, title="Submit Your Trivia Answer"):
             # Save session to disk
             session = answer_service.get_session(self.guild_id)
             if session:
-                storage_service.save_session_to_disk(self.guild_id, session)
+                storage_service.save_session(self.guild_id, session)
 
             # Send appropriate response via followup
             if is_update:

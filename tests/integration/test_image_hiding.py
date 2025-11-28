@@ -67,7 +67,7 @@ class TestImageHidingIntegration:
         with patch('src.services.answer_service.get_session', return_value=None), \
              patch('src.services.answer_service.reset_session'), \
              patch('src.services.answer_service.create_session'), \
-             patch('src.services.storage_service.save_session_to_disk'), \
+             patch('src.services.storage_service.save_session'), \
              patch.object(modal, '_wait_for_image_attachment', new_callable=AsyncMock, return_value=None):
 
             # Execute modal submission
@@ -99,7 +99,7 @@ class TestImageHidingIntegration:
         with patch('src.services.answer_service.get_session', return_value=None), \
              patch('src.services.answer_service.reset_session'), \
              patch('src.services.answer_service.create_session'), \
-             patch('src.services.storage_service.save_session_to_disk'), \
+             patch('src.services.storage_service.save_session'), \
              patch('discord.ui.View') as mock_view_class:
 
             mock_view = MagicMock()
@@ -147,7 +147,7 @@ class TestImageHidingIntegration:
         with patch('src.services.answer_service.get_session', return_value=None), \
              patch('src.services.answer_service.reset_session'), \
              patch('src.services.answer_service.create_session'), \
-             patch('src.services.storage_service.save_session_to_disk'), \
+             patch('src.services.storage_service.save_session'), \
              patch.object(modal, '_wait_for_image_attachment', new_callable=AsyncMock, return_value=mock_embed) as mock_wait:
 
             # Execute modal submission
