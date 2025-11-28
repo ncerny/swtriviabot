@@ -10,6 +10,9 @@ aiohttp>=3.8.0  # For async HTTP requests to Giphy/Tenor APIs (already included 
 # Configuration Management
 python-dotenv>=1.0.0
 
+# Database
+firebase-admin>=6.2.0
+
 # Resource Monitoring
 psutil>=5.9.0
 

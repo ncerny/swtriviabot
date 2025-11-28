@@ -1,10 +1,14 @@
 """Main Discord bot entry point for the Trivia Bot."""
 
+import asyncio
 import logging
 import os
 import signal
 import sys
+import threading
 import time
+import uuid
+from datetime import datetime, timezone
 from typing import NoReturn
 
 import discord
@@ -19,7 +23,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.services import answer_service, storage_service
 from src.commands.list_answers import list_answers_command
 from src.commands.post_question import post_question_command, AnswerButton
-# from src.commands.metrics import metrics_command  # TODO: Implement metrics command
 from src.utils.performance import get_metrics
 from src.utils.resource_monitor import get_resource_monitor
 
@@ -36,20 +39,18 @@ load_dotenv()
 
 # Bot configuration
 DISCORD_BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
-DISCORD_TEST_GUILD_ID = os.getenv("DISCORD_TEST_GUILD_ID")  # Optional: for faster testing
+DISCORD_TEST_GUILD_ID = os.getenv("DISCORD_TEST_GUILD_ID")
+BOT_INSTANCE_ID = os.getenv("BOT_INSTANCE_ID", str(uuid.uuid4()))
 
 if not DISCORD_BOT_TOKEN:
     logger.error("DISCORD_BOT_TOKEN not found in environment variables")
-    print("❌ Error: DISCORD_BOT_TOKEN not found in environment variables")
-    print("Please create a .env file with your bot token (see .env.example)")
     sys.exit(1)
 
-# Discord client with minimal intents for slash-command-only bot
-# Use minimal intents to reduce memory usage from Discord's internal caches
+# Discord client
 intents = discord.Intents.none()
-intents.guilds = True  # Required for guild context
-intents.guild_messages = True  # Required for message events (wait_for)
-intents.message_content = True  # Required for message.content access
+intents.guilds = True
+intents.guild_messages = True
+intents.message_content = True
 
 client = discord.Client(intents=intents)
 tree = app_commands.CommandTree(client)
@@ -57,49 +58,99 @@ tree = app_commands.CommandTree(client)
 # Register commands
 tree.add_command(list_answers_command)
 tree.add_command(post_question_command)
-# tree.add_command(metrics_command)  # TODO: Implement metrics command
+
+# Leader Election Globals
+HEARTBEAT_INTERVAL = 10  # Seconds
+LOCK_EXPIRY = 30  # Seconds
+_heartbeat_stop_event = threading.Event()
 
 
-async def log_resource_stats_periodically() -> None:
-    """Background task to log resource stats every hour."""
-    import asyncio
-    import gc
-    await client.wait_until_ready()
-    monitor = get_resource_monitor()
+def _get_firestore_db():
+    # Helper to get DB from storage service (which initializes it)
+    # We access the protected member for direct DB access for locking
+    return storage_service._get_db()
+
+
+def acquire_lock() -> bool:
+    """Try to acquire the leader lock."""
+    db = _get_firestore_db()
+    if not db:
+        return False
+
+    lock_ref = db.collection("bot_status").document("leader")
     
-    while not client.is_closed():
-        try:
-            # Log GC stats before collection
-            gc_stats_before = gc.get_count()
-            mem_before = monitor.get_memory_usage()
+    try:
+        from firebase_admin import firestore
+        from datetime import timedelta
+
+        # Transactional lock acquisition
+        @firestore.transactional
+        def update_in_transaction(transaction, ref):
+            snapshot = ref.get(transaction=transaction)
+            now = datetime.now(timezone.utc)
             
-            # Force garbage collection across all generations
-            collected = gc.collect(generation=2)  # Full collection
-            
-            # Log GC results
-            mem_after = monitor.get_memory_usage()
-            mem_freed = mem_before['rss_mb'] - mem_after['rss_mb']
-            
-            logger.info(
-                f"GC: freed {collected} objects, "
-                f"memory delta: {mem_freed:+.2f}MB, "
-                f"generations before: {gc_stats_before}"
-            )
-            
-            # Log cache sizes for debugging
-            logger.info(
-                f"Discord cache sizes: "
-                f"messages={len(client.cached_messages)}, "
-                f"guilds={len(client.guilds)}"
-            )
-            
-            monitor.log_stats("periodic check")
-            monitor.check_memory_threshold(warning_mb=100.0, critical_mb=120.0)
-        except Exception as e:
-            logger.error(f"Error logging resource stats: {e}", exc_info=True)
+            if snapshot.exists:
+                data = snapshot.to_dict()
+                expires_at = data.get("expires_at")
+                current_leader = data.get("instance_id")
+                
+                # If lock is held by us, refresh it
+                if current_leader == BOT_INSTANCE_ID:
+                    transaction.update(ref, {
+                        "expires_at": now + timedelta(seconds=LOCK_EXPIRY)
+                    })
+                    return True
+                
+                # If lock is valid and not us, fail
+                if expires_at:
+                    # Convert Firestore timestamp to datetime if needed
+                    # Firestore SDK usually returns datetime objects
+                    if expires_at > now:
+                        return False
+
+            # Lock is free or expired, take it
+            transaction.set(ref, {
+                "instance_id": BOT_INSTANCE_ID,
+                "expires_at": now + timedelta(seconds=LOCK_EXPIRY),
+                "acquired_at": now
+            })
+            return True
         
-        # Wait 1 hour
-        await asyncio.sleep(3600)
+        transaction = db.transaction()
+        return update_in_transaction(transaction, lock_ref)
+        
+    except Exception as e:
+        logger.error(f"Error acquiring lock: {e}")
+        return False
+
+
+def release_lock() -> None:
+    """Release the leader lock."""
+    db = _get_firestore_db()
+    if not db:
+        return
+
+    try:
+        lock_ref = db.collection("bot_status").document("leader")
+        # Only delete if we are the owner
+        doc = lock_ref.get()
+        if doc.exists and doc.to_dict().get("instance_id") == BOT_INSTANCE_ID:
+            lock_ref.delete()
+            logger.info("Released leader lock")
+    except Exception as e:
+        logger.error(f"Error releasing lock: {e}")
+
+
+def heartbeat_loop() -> None:
+    """Background thread to refresh lock."""
+    logger.info("Starting heartbeat loop")
+    while not _heartbeat_stop_event.is_set():
+        if not acquire_lock():
+            logger.error("Lost leader lock during heartbeat! Shutting down...")
+            # We lost the lock, we should probably exit to be safe
+            os.kill(os.getpid(), signal.SIGTERM)
+            break
+        time.sleep(HEARTBEAT_INTERVAL)
 
 
 @client.event
@@ -108,178 +159,99 @@ async def on_ready() -> None:
     user_info = f"{client.user} (ID: {client.user.id})" if client.user else "Unknown"
     logger.info(f"Logged in as {user_info}")
     print(f"✅ Logged in as {user_info}")
-    print("---")
     
-    # Log initial resource usage
-    monitor = get_resource_monitor()
-    monitor.log_stats("startup")
-
-    # Register persistent views for buttons (must be done on every startup)
+    # Register persistent views
     client.add_view(AnswerButton())
-    logger.info("Registered persistent views")
-    print("🔘 Registered persistent views")
-
-    # Load all sessions from disk into memory
-    try:
-        sessions = storage_service.load_all_sessions()
-        answer_service.load_sessions(sessions)
-        logger.info(f"Loaded {len(sessions)} session(s) from disk")
-        print(f"📂 Loaded {len(sessions)} session(s) from disk")
-    except Exception as e:
-        logger.error(f"Failed to load sessions from disk: {e}", exc_info=True)
-        print(f"⚠️  Warning: Failed to load sessions from disk: {e}")
-
-    # Sync slash commands with Discord
+    
+    # Sync commands
     try:
         if DISCORD_TEST_GUILD_ID:
-            # Sync to test guild only (instant, for development)
             guild = discord.Object(id=int(DISCORD_TEST_GUILD_ID))
             tree.copy_global_to(guild=guild)
-            synced = await tree.sync(guild=guild)
-            logger.info(f"Synced {len(synced)} command(s) to test guild {DISCORD_TEST_GUILD_ID}")
-            print(f"🔄 Synced {len(synced)} command(s) to test guild (dev mode)")
+            await tree.sync(guild=guild)
+            logger.info(f"Synced commands to test guild {DISCORD_TEST_GUILD_ID}")
         else:
-            # Sync globally (takes up to 1 hour to propagate)
-            synced = await tree.sync()
-            logger.info(f"Synced {len(synced)} command(s) globally")
-            print(f"🔄 Synced {len(synced)} command(s) globally")
+            await tree.sync()
+            logger.info("Synced commands globally")
     except Exception as e:
-        logger.error(f"Failed to sync commands: {e}", exc_info=True)
-        print(f"❌ Failed to sync commands: {e}")
+        logger.error(f"Failed to sync commands: {e}")
 
     logger.info("Bot is ready!")
-    print("🎮 Bot is ready!")
-    
-    # Start periodic resource monitoring
-    client.loop.create_task(log_resource_stats_periodically())
 
 
 @client.event
 async def on_interaction(interaction: discord.Interaction) -> None:
-    """Track command performance metrics.
-
-    Args:
-        interaction: Discord interaction object
-    """
     if interaction.type == discord.InteractionType.application_command:
-        # Record command execution start time
         interaction.extras["start_time"] = time.perf_counter()
-        interaction.extras["logged_slow"] = False  # Track if we've logged slow warning
-
-
-@client.event
-async def on_interaction_response(interaction: discord.Interaction) -> None:
-    """Track interaction response timing to detect slow operations.
-
-    Args:
-        interaction: Discord interaction object
-    """
-    if "start_time" in interaction.extras and not interaction.extras.get("logged_slow", False):
-        elapsed_time = time.perf_counter() - interaction.extras["start_time"]
-        command_name = interaction.command.name if interaction.command else "unknown"
-        
-        # Warn if response took >2s (approaching Discord's 3s limit)
-        if elapsed_time > 2.0:
-            logger.warning(
-                f"Slow interaction response for /{command_name}: {elapsed_time:.2f}s "
-                f"(Discord requires <3s)"
-            )
-            interaction.extras["logged_slow"] = True
-        
-        # Record successful completion metrics
-        get_metrics().record_command(command_name, elapsed_time * 1000, success=True)
 
 
 @tree.error
-async def on_app_command_error(
-    interaction: discord.Interaction, error: app_commands.AppCommandError
-) -> None:
-    """Global error handler for all slash commands.
-
-    Args:
-        interaction: Discord interaction object
-        error: Error that occurred
-    """
-    # Record performance metrics
-    if "start_time" in interaction.extras:
-        elapsed_time = (time.perf_counter() - interaction.extras["start_time"]) * 1000
-        command_name = interaction.command.name if interaction.command else "unknown"
-        get_metrics().record_command(command_name, elapsed_time, success=False)
-        
-        # Log timing even on errors
-        if elapsed_time > 2000:  # >2s
-            logger.warning(f"Slow command before error /{command_name}: {elapsed_time/1000:.2f}s")
-    
-    logger.error(f"Command error in {interaction.command.name if interaction.command else 'unknown'}: {error}", exc_info=True)
-
-    # Handle specific error types
-    if isinstance(error, app_commands.MissingPermissions):
-        message = "❌ You don't have permission to use this command"
-    elif isinstance(error, app_commands.CommandOnCooldown):
-        message = f"❌ This command is on cooldown. Try again in {error.retry_after:.1f}s"
-    else:
-        message = "❌ Something went wrong, please try again"
-
-    # Send error message
+async def on_app_command_error(interaction: discord.Interaction, error: app_commands.AppCommandError) -> None:
+    logger.error(f"Command error: {error}", exc_info=True)
     try:
+        msg = "❌ Something went wrong"
+        if isinstance(error, app_commands.MissingPermissions):
+            msg = "❌ You don't have permission"
+        elif isinstance(error, app_commands.CommandOnCooldown):
+            msg = f"❌ Cooldown: {error.retry_after:.1f}s"
+            
         if interaction.response.is_done():
-            await interaction.followup.send(message, ephemeral=True)
+            await interaction.followup.send(msg, ephemeral=True)
         else:
-            await interaction.response.send_message(message, ephemeral=True)
-    except Exception as e:
-        logger.error(f"Failed to send error message: {e}", exc_info=True)
+            await interaction.response.send_message(msg, ephemeral=True)
+    except Exception:
+        pass
 
 
 def graceful_shutdown(signum: int, frame: object) -> NoReturn:
-    """Handle graceful shutdown on SIGTERM/SIGINT.
-
-    Args:
-        signum: Signal number
-        frame: Current stack frame
-    """
-    logger.info(f"Received signal {signum}, shutting down gracefully...")
-    print(f"\n🛑 Received signal {signum}, shutting down gracefully...")
+    """Handle graceful shutdown."""
+    logger.info(f"Received signal {signum}, shutting down...")
     
-    # Log final resource usage
-    monitor = get_resource_monitor()
-    monitor.log_stats("shutdown")
-
-    # Save all sessions to disk
-    try:
-        sessions = answer_service.get_all_sessions()
-        for guild_id, session in sessions.items():
-            storage_service.save_session_to_disk(guild_id, session)
-        logger.info(f"Saved {len(sessions)} session(s) to disk")
-        print(f"💾 Saved {len(sessions)} session(s) to disk")
-    except Exception as e:
-        logger.error(f"Failed to save sessions: {e}", exc_info=True)
-        print(f"⚠️  Warning: Failed to save sessions: {e}")
-
+    # Stop heartbeat
+    _heartbeat_stop_event.set()
+    
+    # Release lock
+    release_lock()
+    
     sys.exit(0)
 
 
-# Register signal handlers
 signal.signal(signal.SIGTERM, graceful_shutdown)
 signal.signal(signal.SIGINT, graceful_shutdown)
 
 
 def main() -> None:
-    """Main entry point for the bot."""
-    logger.info("Starting Discord Trivia Bot...")
-    print("🤖 Starting Discord Trivia Bot...")
-    print(f"🐍 Python version: {sys.version}")
-    print(f"📦 discord.py version: {discord.__version__}")
+    """Main entry point."""
+    logger.info(f"Starting Discord Trivia Bot (Instance: {BOT_INSTANCE_ID})")
+    
+    # 1. Migrate local data if any
+    try:
+        storage_service.migrate_local_data()
+    except Exception as e:
+        logger.error(f"Migration failed: {e}")
 
+    # 2. Leader Election Loop
+    logger.info("Entering leader election loop...")
+    while True:
+        if acquire_lock():
+            logger.info("👑 Acquired leader lock! Starting bot...")
+            break
+        else:
+            logger.info("💤 Standby: Leader lock held by another instance. Retrying in 15s...")
+            time.sleep(15)
+
+    # 3. Start Heartbeat
+    heartbeat_thread = threading.Thread(target=heartbeat_loop, daemon=True)
+    heartbeat_thread.start()
+
+    # 4. Run Bot
     try:
         client.run(DISCORD_BOT_TOKEN)
-    except discord.LoginFailure:
-        logger.error("Failed to log in: Invalid token")
-        print("❌ Failed to log in: Invalid token")
-        sys.exit(1)
     except Exception as e:
-        logger.error(f"Fatal error: {e}", exc_info=True)
-        print(f"❌ Fatal error: {e}")
-        sys.exit(1)
+        logger.error(f"Fatal error: {e}")
+    finally:
+        _heartbeat_stop_event.set()
+        release_lock()
 
 
 if __name__ == "__main__":

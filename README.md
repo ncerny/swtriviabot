@@ -9,11 +9,12 @@ A Discord bot for managing trivia game answers with slash commands. Players subm
 ## Features
 
 - **View Submissions**: Admins list all answers with `/list-answers` command
-- **Reset Sessions**: Admins clear all answers with `/reset-answers` command
+- **Auto-Reset**: Posting a new question automatically archives previous answers and starts a fresh session
 - **Auto-Attach Images**: Post a question, then immediately post an image or GIF - the bot automatically re-posts it and cleans up your follow-up message
 - **Native Image Support**: Works with Discord's GIF picker, Tenor embeds, uploaded images, and direct links
 - **Multi-Server Support**: Isolated session state per Discord server
-- **Persistent Storage**: Session data saved to disk for durability
+- **Cloud Persistence**: Session data stored in Firebase Firestore for durability and accessibility
+- **High Availability**: Active-Standby architecture with Leader Election for resiliency
 
 ## Quick Start
 
@@ -31,6 +32,9 @@ A Discord bot for managing trivia game answers with slash commands. Players subm
 
 - Python 3.13 or higher
 - Discord bot token ([Get one here](https://discord.com/developers/applications))
+- **Firebase Project**:
+  - Firestore Database enabled
+  - Service Account Private Key (`serviceAccountKey.json`)
 - Discord bot invited to your server with:
   - `applications.commands` scope
   - `bot` scope with permissions:
@@ -62,6 +66,9 @@ A Discord bot for managing trivia game answers with slash commands. Players subm
    # Edit .env and add your DISCORD_BOT_TOKEN
    ```
 
+4. Add Firebase credentials:
+   - Place your `serviceAccountKey.json` in the project root
+
 4. Run the bot:
    ```bash
    python src/bot.py
@@ -83,13 +90,13 @@ A Discord bot for managing trivia game answers with slash commands. Players subm
 
 ### Player Commands
 
-**`/answer [text]`** - Submit your answer to the current question
+**Click "Submit Your Answer"** - Click the button on the question message to open the answer form.
 
 Example:
 
-```
-/answer The capital of France is Paris
-```
+1. Click **Submit Your Answer** button
+2. Type your answer in the popup form
+3. Click **Submit**
 
 Response on first submission:
 
@@ -130,19 +137,9 @@ When no answers submitted:
 📋 No answers submitted yet
 ```
 
-**`/reset-answers`** - Clear all answers and start fresh
+**Note on Resetting:**
 
-Example response:
-
-```
-🔄 All answers have been reset - ready for next question!
-```
-
-**Notes:**
-
-- Only users with Administrator permission can use these commands
-- `/reset-answers` permanently deletes all session data
-- After reset, users can submit new answers
+There is no manual `/reset-answers` command. The session is automatically reset when you run `/post-question` to start a new round. The bot will display the previous day's answers to you before clearing them.
 
 ---
 
@@ -420,9 +417,8 @@ src/
 │   ├── permission_service.py # Permission checks
 │   └── storage_service.py   # Disk persistence
 ├── commands/                 # Slash command handlers
-│   ├── answer.py            # /answer handler
 │   ├── list_answers.py      # /list-answers handler
-│   └── reset_answers.py     # /reset-answers handler
+│   └── post_question.py     # /post-question handler & AnswerButton
 └── utils/                    # Utilities
     ├── validators.py        # Input validation
     └── formatters.py        # Message formatting
@@ -430,15 +426,15 @@ src/
 
 ### Data Flow
 
-1. **Answer Submission**: User → Discord → `/answer` command → answer_service → storage_service → disk
-2. **List Answers**: Admin → Discord → `/list-answers` command → answer_service → formatters → Discord
-3. **Reset Session**: Admin → Discord → `/reset-answers` command → answer_service → storage_service → disk cleanup
+1. **Answer Submission**: User → Click Button → Modal → answer_service → storage_service → Firestore
+2. **List Answers**: Admin → `/list-answers` → answer_service → formatters → Discord
+3. **New Question**: Admin → `/post-question` → Modal → answer_service.reset_session → storage_service → Firestore
 
 ### Storage Model
 
-- **In-memory cache**: `dict[guild_id, TriviaSession]` for fast access
-- **Disk persistence**: JSON files in `/data/{guild_id}.json` for durability
-- **Hybrid approach**: Read from disk on startup, write on every change
+- **Firestore**: All session data is stored in the `sessions` collection.
+- **Leader Election**: Bot instances coordinate via `bot_status/leader` document in Firestore.
+- **Stateless**: No local state is maintained, allowing any instance to serve requests.
 
 ---
 
@@ -459,9 +455,9 @@ All contributions must comply with these principles.
 
 ### Completed ✅
 
-- [x] Answer submission with duplicate detection
+- [x] Answer submission via Button/Modal
 - [x] Admin view all answers
-- [x] Admin reset session
+- [x] Automatic session reset on new question
 - [x] Disk persistence
 - [x] Multi-server support
 

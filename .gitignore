@@ -1,4 +1,6 @@
 # Environment and Secrets
+# Secrets
+serviceAccountKey.json
 .env
 .env.local
 

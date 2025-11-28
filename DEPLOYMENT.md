@@ -5,8 +5,9 @@ This guide covers deploying the Discord Trivia Bot using production artifacts fr
 ## Prerequisites
 
 - Discord bot token (see [README.md](README.md) for setup instructions)
+- Firebase Project with Firestore enabled
+- `serviceAccountKey.json` file
 - Hosting platform account (pella.app recommended)
-- (Optional) Git repository access for source deployment
 
 ---
 
@@ -48,6 +49,9 @@ cp .env.example .env
 
 # Edit .env and add your token
 # DISCORD_BOT_TOKEN=your_token_here
+
+# Add Firebase credentials
+# Copy serviceAccountKey.json to project root
 ```
 
 ### 4. Run the Bot
@@ -98,10 +102,10 @@ Ensure your repository has the following files:
    - Save changes
 
 3. **Persistent Storage**
-
-   - Go to "Settings" → "Volumes"
-   - Add volume: `/app/data` (100MB)
-   - Save changes
+   
+   - Not required! Data is stored in Firebase Firestore.
+   - Ensure `serviceAccountKey.json` is uploaded or provided via environment variable `FIREBASE_CREDENTIALS` (if supported by your bot code, currently file-based).
+   - *Note*: For pella.app, you may need to commit `serviceAccountKey.json` (not recommended for public repos) or use a build secret injection method.
 
 4. **Deploy**
    - Click "Deploy"
@@ -118,10 +122,8 @@ Ensure your repository has the following files:
 
 1. Create new project from GitHub repo
 2. Add environment variable: `DISCORD_BOT_TOKEN`
-3. Configure volume mount:
-   - Path: `/app/data`
-   - Size: 100MB
-4. Deploy using `Procfile` configuration
+3. **Configure Volume**: Not required (using Firestore).
+4. **Secrets**: Add `serviceAccountKey.json` content as a secret file or variable.
 
 ### Heroku
 
@@ -147,8 +149,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY src/ ./src/
 
-# Create data directory for persistence
-RUN mkdir -p /app/data
+# Copy Firebase credentials
+COPY serviceAccountKey.json .
 
 CMD ["python", "src/bot.py"]
 ```
@@ -165,7 +167,6 @@ docker build -t discord-trivia-bot .
 docker run -d \
   --name trivia-bot \
   -e DISCORD_BOT_TOKEN=your_token_here \
-  -v /path/to/data:/app/data \
   discord-trivia-bot
 ```
 
@@ -190,17 +191,10 @@ Monitor application logs for:
 
 ### Backup Session Data
 
-Session data is stored in `/data/*.json` files:
+Session data is stored in Firestore. Use Firebase Console to export/import data.
 
-1. Access your hosting platform's file browser
-2. Download all `.json` files from `/data/` directory
-3. Store backups securely
-
-### Restore Session Data
-
-1. Upload backed-up `.json` files to `/data/` directory
-2. Restart the bot
-3. Sessions will be loaded automatically on startup
+1. Go to Firebase Console -> Firestore
+2. Use the Import/Export feature to backup the `sessions` collection.
 
 ---
 
