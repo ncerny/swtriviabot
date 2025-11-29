@@ -1,0 +1,18 @@
+[Unit]
+Description=USS Enterprise Trivia Discord Bot
+After=network-online.target
+
+[Service]
+Type=simple
+User=swtriviabot
+WorkingDirectory=/opt/swtriviabot
+ExecStart=/opt/swtriviabot/.venv/bin/python /opt/swtriviabot/src/bot.py
+Restart=on-failure
+RestartSec=10
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=swtriviabot
+
+[Install]
+WantedBy=multi-user.target

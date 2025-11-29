@@ -1,0 +1,51 @@
+[Unit]
+Description=USS Enterprise Trivia Discord Bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+
+# CHANGE THESE TO YOUR ACTUAL VALUES:
+User=YOUR_USERNAME
+Group=YOUR_USERNAME
+WorkingDirectory=/home/YOUR_USERNAME/swtriviabot
+Environment="PATH=/home/YOUR_USERNAME/swtriviabot/.venv/bin:/usr/local/bin:/usr/bin:/bin"
+
+# Load environment variables from .env file
+# NOTE: systemd cannot read .env files directly, so we rely on bot.py to load it
+# Make sure your bot.py has: from dotenv import load_dotenv; load_dotenv()
+
+# Start the bot
+ExecStart=/home/YOUR_USERNAME/swtriviabot/.venv/bin/python /home/YOUR_USERNAME/swtriviabot/src/bot.py
+
+# Restart policy
+Restart=on-failure
+RestartSec=10
+StartLimitInterval=300
+StartLimitBurst=5
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=swtriviabot
+
+# Security hardening (OPTIONAL - comment these out if causing issues)
+NoNewPrivileges=true
+PrivateTmp=true
+
+# DO NOT USE ProtectSystem or ProtectHome if your bot is in /home
+# These were in the original but can cause issues:
+# ProtectSystem=strict
+# ProtectHome=read-only
+
+# Only set ReadWritePaths if you need to write to specific locations
+# ReadWritePaths=/home/YOUR_USERNAME/swtriviabot/data
+# ReadWritePaths=/home/YOUR_USERNAME/swtriviabot/.beads
+
+# Resource limits (adjust as needed)
+MemoryMax=512M
+CPUQuota=50%
+
+[Install]
+WantedBy=multi-user.target

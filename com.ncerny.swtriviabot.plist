@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.ncerny.swtriviabot</string>
+    
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/ncerny/workspace/swtriviabot/.venv/bin/python</string>
+        <string>/Users/ncerny/workspace/swtriviabot/src/bot.py</string>
+    </array>
+    
+    <key>WorkingDirectory</key>
+    <string>/Users/ncerny/workspace/swtriviabot</string>
+    
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/Users/ncerny/workspace/swtriviabot/.venv/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+    
+    <key>RunAtLoad</key>
+    <true/>
+    
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+        <key>Crashed</key>
+        <true/>
+    </dict>
+    
+    <key>StandardOutPath</key>
+    <string>/Users/ncerny/workspace/swtriviabot/logs/stdout.log</string>
+    
+    <key>StandardErrorPath</key>
+    <string>/Users/ncerny/workspace/swtriviabot/logs/stderr.log</string>
+    
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+    
+    <key>ProcessType</key>
+    <string>Interactive</string>
+    
+    <key>Nice</key>
+    <integer>0</integer>
+</dict>
+</plist>

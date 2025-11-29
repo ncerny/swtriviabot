@@ -1,0 +1,44 @@
+[Unit]
+Description=USS Enterprise Trivia Discord Bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=swtriviabot
+Group=swtriviabot
+WorkingDirectory=/opt/swtriviabot
+Environment="PATH=/opt/swtriviabot/.venv/bin:/usr/local/bin:/usr/bin:/bin"
+
+# Note: EnvironmentFile is not needed - bot.py loads .env via python-dotenv
+
+# Start the bot
+ExecStart=/opt/swtriviabot/.venv/bin/python /opt/swtriviabot/src/bot.py
+
+# Restart policy
+Restart=on-failure
+RestartSec=10
+StartLimitInterval=300
+StartLimitBurst=5
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=swtriviabot
+
+# Resource limits (optional - adjust as needed)
+MemoryMax=512M
+CPUQuota=80%
+
+# Security hardening (optional - commented out by default)
+# Enable these only after confirming the basic service works
+# WARNING: These can prevent the bot from accessing files in /opt
+# NoNewPrivileges=true
+# PrivateTmp=true
+# ProtectSystem=strict
+# ProtectHome=read-only
+# ReadWritePaths=/opt/swtriviabot/data
+# ReadWritePaths=/opt/swtriviabot/.beads
+
+[Install]
+WantedBy=multi-user.target
