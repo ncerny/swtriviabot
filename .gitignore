@@ -71,3 +71,6 @@ logs/
 
 # AI planning documents (ephemeral)
 history/
+
+# Spec-Kit agent folder (may contain credentials/tokens)
+.claude/
