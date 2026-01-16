@@ -109,8 +109,9 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
                         except:
                             pass  # Ignore delete errors
 
-                        # For Tenor embeds, always try to resolve to proper GIF URL
+                        # For Tenor/Klipy embeds, always try to resolve to proper GIF URL
                         tenor_url = None
+                        klipy_url = None
 
                         # Check all possible Tenor URL sources
                         if embed.url and 'tenor.com' in embed.url:
@@ -120,9 +121,23 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
                         elif embed.video and embed.video.url and 'tenor.com' in embed.video.url:
                             tenor_url = embed.video.url
 
+                        # Check all possible Klipy URL sources
+                        if embed.url and 'klipy.com' in embed.url:
+                            klipy_url = embed.url
+                        elif embed.image and embed.image.url and 'klipy.com' in embed.image.url:
+                            klipy_url = embed.image.url
+                        elif embed.video and embed.video.url and 'klipy.com' in embed.video.url:
+                            klipy_url = embed.video.url
+
                         # If we found any Tenor URL, resolve it to get the proper GIF
                         if tenor_url:
                             resolved_embed = await self._resolve_tenor_url(tenor_url)
+                            if resolved_embed:
+                                return resolved_embed
+
+                        # If we found any Klipy URL, resolve it to get the proper GIF
+                        if klipy_url:
+                            resolved_embed = await self._resolve_klipy_url(klipy_url)
                             if resolved_embed:
                                 return resolved_embed
 
@@ -169,6 +184,16 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
                     # Check if it's a Tenor URL - handle differently
                     if 'tenor.com' in urls[0]:
                         resolved_embed = await self._resolve_tenor_url(urls[0])
+                        if resolved_embed:
+                            # Delete the user's message
+                            try:
+                                await message.delete()
+                            except:
+                                pass
+                            return resolved_embed
+                    # Check if it's a Klipy URL - handle differently
+                    elif 'klipy.com' in urls[0]:
+                        resolved_embed = await self._resolve_klipy_url(urls[0])
                         if resolved_embed:
                             # Delete the user's message
                             try:
@@ -294,6 +319,97 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
             print(f"Error resolving Tenor URL {url}: {e}")
             return None
 
+    async def _resolve_klipy_url(self, url: str) -> discord.Embed | None:
+        """
+        Resolve a Klipy URL to the actual GIF/MP4 using the API.
+
+        Args:
+            url: Klipy URL (e.g., https://klipy.com/gifs/slug-name)
+
+        Returns:
+            Discord embed with the actual GIF/MP4, or None if resolution fails
+        """
+        try:
+            import re
+
+            # Extract slug from URL: https://klipy.com/gifs/{slug}
+            match = re.search(r'klipy\.com/gifs/([^/?#]+)', url)
+            if not match:
+                print(f"DEBUG: Could not extract Klipy slug from URL: {url}")
+                return None
+
+            slug = match.group(1)
+            print(f"DEBUG: Extracted Klipy slug: {slug}")
+
+            api_key = os.getenv('KLIPY_API_KEY')
+            print(f"DEBUG: Klipy API key present: {api_key is not None}")
+
+            if not api_key:
+                print("DEBUG: No Klipy API key configured")
+                return None
+
+            # Use Klipy API to get the GIF details
+            api_url = f"https://api.klipy.com/api/v1/{api_key}/gifs/items"
+            params = {'slugs': slug}
+
+            print(f"DEBUG: Making Klipy API call to: {api_url}?slugs={slug}")
+
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10.0)) as temp_session:
+                async with temp_session.get(api_url, params=params) as response:
+                    if response.status != 200:
+                        print(f"DEBUG: Klipy API returned status {response.status}")
+                        return None
+
+                    try:
+                        data = await response.json()
+                        print(f"DEBUG: Klipy API response: {data}")
+                    except Exception as e:
+                        print(f"DEBUG: Failed to parse Klipy JSON response: {e}")
+                        return None
+
+                    if not data or not isinstance(data, dict):
+                        print(f"DEBUG: Invalid Klipy response data: {type(data)}")
+                        return None
+
+                    # API returns nested structure: data.data[] contains items
+                    items = data.get('data', {}).get('data', [])
+                    if not items:
+                        print("DEBUG: No items in Klipy API response")
+                        return None
+
+                    item = items[0]
+                    file_info = item.get('file', {})
+                    print(f"DEBUG: Klipy file quality levels: {list(file_info.keys())}")
+
+                    # File structure has quality tiers (hd, md, sm, xs) with format objects
+                    # Prefer HD quality, fallback through md, sm, xs
+                    # Each tier has: gif, webp, jpg, mp4, webm with url field
+                    media_url = None
+                    for quality in ['hd', 'md', 'sm', 'xs']:
+                        quality_info = file_info.get(quality, {})
+                        # Prefer GIF, fallback to MP4
+                        if quality_info.get('gif', {}).get('url'):
+                            media_url = quality_info['gif']['url']
+                            break
+                        elif quality_info.get('mp4', {}).get('url'):
+                            media_url = quality_info['mp4']['url']
+                            break
+
+                    if not media_url:
+                        print("DEBUG: No GIF or MP4 URL in Klipy response")
+                        return None
+
+                    print(f"DEBUG: Resolved Klipy media URL: {media_url}")
+
+                    # Create embed with the actual media
+                    embed = discord.Embed()
+                    embed.set_image(url=media_url)
+                    return embed
+
+        except Exception as e:
+            print(f"Error resolving Klipy URL {url}: {e}")
+            return None
+
     async def on_submit(self, interaction: discord.Interaction) -> None:
         """Handle modal submission."""
         try:
@@ -343,7 +459,6 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
 
             # Get previous answers before resetting
             previous_session = answer_service.get_session(self.guild_id)
-            previous_answers_message = None
 
             if previous_session and previous_session.answers:
                 # Format previous answers
@@ -354,25 +469,49 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
                         f"**{answer.username}** ({timestamp_str}):\n{answer.text}\n"
                     )
 
-                answers_text = "\n".join(answer_lines)
+                # Split into multiple messages if needed (Discord has 2000 char limit)
+                header = f"📋 **Previous Session Answers** (before reset)\n\n"
+                footer = f"\n_Total answers: {len(previous_session.answers)}_"
+                max_content_length = 1800  # Conservative limit
 
-                # Truncate if too long
-                if len(answers_text) > 1800:
-                    answers_text = answers_text[:1800] + "\n\n_(truncated due to length)_"
+                messages_to_send = []
+                current_message_parts = []
+                current_length = 0
 
-                previous_answers_message = (
-                    f"📋 **Previous Session Answers** (before reset)\n\n"
-                    f"{answers_text}\n"
-                    f"_Total answers: {len(previous_session.answers)}_"
-                )
+                for answer_line in answer_lines:
+                    # Check if adding this answer would exceed the limit
+                    if current_length + len(answer_line) + 1 > max_content_length and current_message_parts:
+                        # Send current batch
+                        messages_to_send.append("\n".join(current_message_parts))
+                        current_message_parts = []
+                        current_length = 0
 
-            # Send previous answers to admin FIRST (before resetting)
-            if previous_answers_message:
+                    current_message_parts.append(answer_line)
+                    current_length += len(answer_line) + 1  # +1 for newline
+
+                # Add remaining answers
+                if current_message_parts:
+                    messages_to_send.append("\n".join(current_message_parts))
+
+                # Send all message parts
                 try:
-                    await interaction.followup.send(
-                        previous_answers_message,
-                        ephemeral=True,
-                    )
+                    for i, answers_text in enumerate(messages_to_send):
+                        if i == 0:
+                            # First message gets header
+                            message = header + answers_text
+                            if len(messages_to_send) == 1:
+                                # Only one message, add footer too
+                                message += footer
+                            else:
+                                message += f"\n\n_(continued in next message...)_"
+                        elif i == len(messages_to_send) - 1:
+                            # Last message gets footer
+                            message = f"_(continued)_\n\n{answers_text}{footer}"
+                        else:
+                            # Middle messages
+                            message = f"_(continued)_\n\n{answers_text}\n\n_(continued in next message...)_"
+
+                        await interaction.followup.send(message, ephemeral=True)
                 except discord.errors.NotFound:
                     logger.error("Interaction expired before sending previous answers", exc_info=True)
                 except Exception as e:

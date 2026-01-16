@@ -447,3 +447,299 @@ async def test_post_question_command_error_flow(mock_interaction, monkeypatch: p
     await _invoke_post_question_command(mock_interaction)
 
     assert mock_interaction.response.send_message.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_resolve_klipy_url_fetches_gif(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Valid Klipy URLs produce embeds with the resolved GIF URL."""
+
+    channel = DummyChannel()
+    modal = PostQuestionModal(guild_id=1001, channel=cast(discord.TextChannel, channel))
+
+    class _FakeResponse:
+        status = 200
+
+        async def json(self):
+            # Actual Klipy API response structure: data.data[] with quality tiers
+            return {
+                "result": True,
+                "data": {
+                    "data": [
+                        {
+                            "slug": "galadriel-1",
+                            "title": "Galadriel",
+                            "file": {
+                                "hd": {
+                                    "gif": {"url": "https://cdn.klipy.com/hd/image.gif", "width": 498, "height": 278},
+                                    "mp4": {"url": "https://cdn.klipy.com/hd/video.mp4", "width": 640, "height": 358},
+                                },
+                                "md": {
+                                    "gif": {"url": "https://cdn.klipy.com/md/image.gif", "width": 640, "height": 358},
+                                    "mp4": {"url": "https://cdn.klipy.com/md/video.mp4", "width": 640, "height": 358},
+                                },
+                            },
+                        }
+                    ],
+                    "meta": {},
+                },
+            }
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+    class _FakeSession:
+        def __init__(self, *args, **kwargs):
+            self.recorded = None
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        def get(self, url: str, params: dict[str, str]):
+            self.recorded = (url, params)
+            return _FakeResponse()
+
+    monkeypatch.setattr("src.commands.post_question.aiohttp.ClientSession", _FakeSession)
+    monkeypatch.setenv("KLIPY_API_KEY", "test-klipy-key")
+
+    embed = await modal._resolve_klipy_url("https://klipy.com/gifs/galadriel-1")
+
+    assert embed is not None
+    assert embed.image.url == "https://cdn.klipy.com/hd/image.gif"
+
+
+@pytest.mark.asyncio
+async def test_resolve_klipy_url_prefers_gif_over_mp4(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Klipy URL resolution prefers GIF format over MP4."""
+
+    channel = DummyChannel()
+    modal = PostQuestionModal(guild_id=1002, channel=cast(discord.TextChannel, channel))
+
+    class _FakeResponse:
+        status = 200
+
+        async def json(self):
+            return {
+                "result": True,
+                "data": {
+                    "data": [
+                        {
+                            "slug": "test-slug",
+                            "file": {
+                                "hd": {
+                                    "gif": {"url": "https://cdn.klipy.com/preferred.gif"},
+                                    "mp4": {"url": "https://cdn.klipy.com/fallback.mp4"},
+                                },
+                            },
+                        }
+                    ],
+                    "meta": {},
+                },
+            }
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+    class _FakeSession:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        def get(self, url: str, params: dict[str, str]):
+            return _FakeResponse()
+
+    monkeypatch.setattr("src.commands.post_question.aiohttp.ClientSession", _FakeSession)
+    monkeypatch.setenv("KLIPY_API_KEY", "test-key")
+
+    embed = await modal._resolve_klipy_url("https://klipy.com/gifs/test-slug")
+
+    assert embed is not None
+    assert embed.image.url == "https://cdn.klipy.com/preferred.gif"
+
+
+@pytest.mark.asyncio
+async def test_resolve_klipy_url_falls_back_to_mp4(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Klipy URL resolution falls back to MP4 when GIF is not available."""
+
+    channel = DummyChannel()
+    modal = PostQuestionModal(guild_id=1003, channel=cast(discord.TextChannel, channel))
+
+    class _FakeResponse:
+        status = 200
+
+        async def json(self):
+            return {
+                "result": True,
+                "data": {
+                    "data": [
+                        {
+                            "slug": "mp4-only",
+                            "file": {
+                                "hd": {
+                                    "mp4": {"url": "https://cdn.klipy.com/video.mp4"},
+                                    "webp": {"url": "https://cdn.klipy.com/image.webp"},
+                                },
+                            },
+                        }
+                    ],
+                    "meta": {},
+                },
+            }
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+    class _FakeSession:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        def get(self, url: str, params: dict[str, str]):
+            return _FakeResponse()
+
+    monkeypatch.setattr("src.commands.post_question.aiohttp.ClientSession", _FakeSession)
+    monkeypatch.setenv("KLIPY_API_KEY", "test-key")
+
+    embed = await modal._resolve_klipy_url("https://klipy.com/gifs/mp4-only")
+
+    assert embed is not None
+    assert embed.image.url == "https://cdn.klipy.com/video.mp4"
+
+
+@pytest.mark.asyncio
+async def test_resolve_klipy_url_handles_missing_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Without an API key the Klipy resolver returns None."""
+
+    channel = DummyChannel()
+    modal = PostQuestionModal(guild_id=1004, channel=cast(discord.TextChannel, channel))
+
+    monkeypatch.delenv("KLIPY_API_KEY", raising=False)
+
+    result = await modal._resolve_klipy_url("https://klipy.com/gifs/galadriel")
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_resolve_klipy_url_invalid_link(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Unexpected Klipy URLs that lack a slug return None."""
+
+    channel = DummyChannel()
+    modal = PostQuestionModal(guild_id=1005, channel=cast(discord.TextChannel, channel))
+
+    monkeypatch.setenv("KLIPY_API_KEY", "present")
+
+    result = await modal._resolve_klipy_url("https://klipy.com/no-gifs-path")
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_resolve_klipy_url_handles_api_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Klipy API errors are handled gracefully."""
+
+    channel = DummyChannel()
+    modal = PostQuestionModal(guild_id=1006, channel=cast(discord.TextChannel, channel))
+
+    class _FakeResponse:
+        status = 404
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+    class _FakeSession:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        def get(self, url: str, params: dict[str, str]):
+            return _FakeResponse()
+
+    monkeypatch.setattr("src.commands.post_question.aiohttp.ClientSession", _FakeSession)
+    monkeypatch.setenv("KLIPY_API_KEY", "test-key")
+
+    result = await modal._resolve_klipy_url("https://klipy.com/gifs/nonexistent")
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_wait_for_image_attachment_handles_klipy_embed(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Embedded Klipy links are resolved to GIF embeds."""
+
+    channel = DummyChannel()
+    modal = PostQuestionModal(guild_id=1007, channel=cast(discord.TextChannel, channel))
+    user = object()
+
+    resolved_embed = discord.Embed(title="Resolved Klipy")
+    modal._resolve_klipy_url = AsyncMock(return_value=resolved_embed)
+
+    embed_stub = SimpleNamespace(
+        type="gifv",
+        url="https://klipy.com/gifs/galadriel-1",
+        image=None,
+        video=None,
+        title=None,
+        description=None,
+        thumbnail=None,
+        footer=None,
+    )
+
+    message = _build_message(channel=channel, author=user, embeds=[embed_stub])
+    modal.interaction = cast(discord.Interaction, SimpleNamespace(client=FakeClient(message), user=user))
+
+    result = await modal._wait_for_image_attachment(timeout=5.0)
+
+    assert result is resolved_embed
+    assert message.deleted
+
+
+@pytest.mark.asyncio
+async def test_wait_for_image_attachment_handles_klipy_plain_url(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Plain Klipy URLs in message content are resolved."""
+
+    channel = DummyChannel()
+    modal = PostQuestionModal(guild_id=1008, channel=cast(discord.TextChannel, channel))
+    user = object()
+
+    resolved_embed = discord.Embed(title="Resolved Plain Klipy")
+    modal._resolve_klipy_url = AsyncMock(return_value=resolved_embed)
+
+    message = _build_message(
+        channel=channel,
+        author=user,
+        content="https://klipy.com/gifs/galadriel",
+    )
+    modal.interaction = cast(discord.Interaction, SimpleNamespace(client=FakeClient(message), user=user))
+
+    result = await modal._wait_for_image_attachment(timeout=2.0)
+
+    assert result is resolved_embed
+    modal._resolve_klipy_url.assert_awaited_once_with("https://klipy.com/gifs/galadriel")
+    assert message.deleted
