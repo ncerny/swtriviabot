@@ -22,6 +22,7 @@ class TriviaSession:
         answers: Optional[dict[str, Answer]] = None,
         created_at: Optional[datetime] = None,
         last_activity: Optional[datetime] = None,
+        question_text: Optional[str] = None,
     ) -> None:
         """Initialize a new trivia session.
 
@@ -30,6 +31,7 @@ class TriviaSession:
             answers: Existing answers dictionary (default: empty dict)
             created_at: Session creation timestamp (default: current time)
             last_activity: Last activity timestamp (default: current time)
+            question_text: The trivia question text (default: None)
         """
         if not guild_id:
             raise ValueError("guild_id cannot be empty")
@@ -38,6 +40,7 @@ class TriviaSession:
         self.answers = answers or {}
         self.created_at = created_at or datetime.now(timezone.utc)
         self.last_activity = last_activity or datetime.now(timezone.utc)
+        self.question_text = question_text
 
         # Validate timestamps
         if self.last_activity < self.created_at:
@@ -93,6 +96,7 @@ class TriviaSession:
             "answers": {user_id: answer.to_dict() for user_id, answer in self.answers.items()},
             "created_at": self.created_at.isoformat(),
             "last_activity": self.last_activity.isoformat(),
+            "question_text": self.question_text,
         }
 
     @classmethod
@@ -120,4 +124,5 @@ class TriviaSession:
             answers=answers,
             created_at=datetime.fromisoformat(str(data["created_at"])),
             last_activity=datetime.fromisoformat(str(data["last_activity"])),
+            question_text=data.get("question_text"),
         )

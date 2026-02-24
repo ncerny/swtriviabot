@@ -77,3 +77,44 @@ def test_trivia_session_add_or_update_flips_flag() -> None:
     is_update_second = session.add_or_update_answer(second)
     assert is_update_second is True
     assert second.is_updated is True
+
+
+class TestTriviaSessionQuestionText:
+    """Tests for question_text field on TriviaSession."""
+
+    def test_defaults_to_none(self):
+        session = TriviaSession(guild_id="guild123")
+        assert session.question_text is None
+
+    def test_accepts_question_text(self):
+        session = TriviaSession(guild_id="guild123", question_text="What is 2+2?")
+        assert session.question_text == "What is 2+2?"
+
+    def test_to_dict_includes_question_text(self):
+        session = TriviaSession(guild_id="guild123", question_text="Q?")
+        data = session.to_dict()
+        assert data["question_text"] == "Q?"
+
+    def test_to_dict_includes_none_question_text(self):
+        session = TriviaSession(guild_id="guild123")
+        data = session.to_dict()
+        assert data["question_text"] is None
+
+    def test_from_dict_restores_question_text(self):
+        session = TriviaSession(guild_id="guild123", question_text="Q?")
+        data = session.to_dict()
+        restored = TriviaSession.from_dict(data)
+        assert restored.question_text == "Q?"
+
+    def test_from_dict_handles_missing_question_text(self):
+        """Backward compatibility: old sessions without question_text."""
+        from datetime import datetime, timezone
+
+        data = {
+            "guild_id": "guild123",
+            "answers": {},
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "last_activity": datetime.now(timezone.utc).isoformat(),
+        }
+        session = TriviaSession.from_dict(data)
+        assert session.question_text is None
