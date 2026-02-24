@@ -32,6 +32,7 @@ logger.info(f"  Collection suffix: '{COLLECTION_SUFFIX}'")
 # Initialize Firebase
 _db = None
 
+
 def _get_db():
     """Get or initialize Firestore client."""
     global _db
@@ -41,13 +42,13 @@ def _get_db():
             if not cred_path.exists():
                 logger.error(f"Service account key not found at {cred_path}")
                 return None
-            
+
             cred = credentials.Certificate(str(cred_path))
             try:
                 firebase_admin.get_app()
             except ValueError:
                 firebase_admin.initialize_app(cred)
-            
+
             _db = firestore.client()
         except Exception as e:
             logger.error(f"Failed to initialize Firestore: {e}")
@@ -57,7 +58,7 @@ def _get_db():
 
 def load_session(guild_id: str) -> Optional[TriviaSession]:
     """Load a session from Firestore.
-    
+
     Args:
         guild_id: Discord server/guild ID
 
@@ -71,7 +72,7 @@ def load_session(guild_id: str) -> Optional[TriviaSession]:
     try:
         doc_ref = db.collection(f"sessions{COLLECTION_SUFFIX}").document(str(guild_id))
         doc = doc_ref.get()
-        
+
         if doc.exists:
             data = doc.to_dict()
             # Ensure guild_id is in data (it's the doc ID)
@@ -120,7 +121,7 @@ def delete_session(guild_id: str) -> None:
 
 def load_all_sessions() -> dict[str, TriviaSession]:
     """Load all sessions from Firestore.
-    
+
     Returns:
         Dictionary of sessions keyed by guild_id
     """
@@ -141,7 +142,7 @@ def load_all_sessions() -> dict[str, TriviaSession]:
                 logger.error(f"Error parsing session {doc.id}: {e}")
     except Exception as e:
         logger.error(f"Error loading all sessions: {e}")
-    
+
     return sessions
 
 
@@ -156,26 +157,26 @@ def migrate_local_data() -> None:
         return
 
     logger.info("Checking for local data to migrate...")
-    
+
     count = 0
     for file_path in DATA_DIR.glob("*.json"):
         try:
             guild_id = file_path.stem
             logger.info(f"Migrating session for guild {guild_id}...")
-            
+
             # Load local file
             with open(file_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 session = TriviaSession.from_dict(data)
-            
+
             # Save to Firestore
             save_session(guild_id, session)
-            
+
             # Rename file to mark as migrated
             file_path.rename(file_path.with_suffix(".json.migrated"))
             count += 1
             logger.info(f"Successfully migrated guild {guild_id}")
-            
+
         except Exception as e:
             logger.error(f"Failed to migrate {file_path}: {e}")
 

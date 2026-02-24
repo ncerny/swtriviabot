@@ -18,7 +18,7 @@ SESSION_TTL_DAYS = 7
 
 def _cleanup_stale_sessions() -> None:
     """Remove sessions older than SESSION_TTL_DAYS with no activity.
-    
+
     This is a safety net to prevent memory leaks if questions aren't posted regularly.
     Normally /post-question resets sessions daily.
     """

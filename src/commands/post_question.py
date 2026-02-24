@@ -18,11 +18,6 @@ from src.services import answer_service, storage_service, image_service
 logger = logging.getLogger(__name__)
 
 
-
-
-
-
-
 class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
     """Modal form for posting a trivia question with previous day's results."""
 
@@ -50,20 +45,18 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
         style=discord.TextStyle.paragraph,
     )
 
-
-
     def __init__(self, guild_id: int, channel: discord.TextChannel):
         super().__init__()
         self.guild_id = str(guild_id)  # Convert to string for consistency with answer_service
         self.channel = channel
         self.interaction = None  # Will be set in on_submit
 
-
-
-    async def _watch_for_image_and_edit(self, question_message: discord.Message, timeout: float = 300.0) -> None:
+    async def _watch_for_image_and_edit(
+        self, question_message: discord.Message, timeout: float = 300.0
+    ) -> None:
         """
         Background task: Watch for image attachment and edit message if found.
-        
+
         This runs as a background task and does not block the interaction response.
 
         Args:
@@ -91,19 +84,25 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
         try:
             # Wait for the next message from the same user in the same channel
             message = await self.interaction.client.wait_for(
-                'message',
+                "message",
                 timeout=timeout,
                 check=lambda m: (
-                    m.author == self.interaction.user and
-                    m.channel == self.channel and
-                    (m.embeds or m.attachments or 'http' in m.content)  # Has embeds, attachments, or URLs
-                )
+                    m.author == self.interaction.user
+                    and m.channel == self.channel
+                    and (
+                        m.embeds or m.attachments or "http" in m.content
+                    )  # Has embeds, attachments, or URLs
+                ),
             )
 
             # Check for image embeds (Tenor GIFs, uploaded images, etc.)
             if message.embeds:
                 for embed in message.embeds:
-                    if embed.type == 'image' or embed.type == 'gifv' or (embed.image and embed.image.url):
+                    if (
+                        embed.type == "image"
+                        or embed.type == "gifv"
+                        or (embed.image and embed.image.url)
+                    ):
                         # Always delete the user's message since we're re-posting the image
                         try:
                             await message.delete()
@@ -115,19 +114,19 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
                         klipy_url = None
 
                         # Check all possible Tenor URL sources
-                        if embed.url and 'tenor.com' in embed.url:
+                        if embed.url and "tenor.com" in embed.url:
                             tenor_url = embed.url
-                        elif embed.image and embed.image.url and 'tenor.com' in embed.image.url:
+                        elif embed.image and embed.image.url and "tenor.com" in embed.image.url:
                             tenor_url = embed.image.url
-                        elif embed.video and embed.video.url and 'tenor.com' in embed.video.url:
+                        elif embed.video and embed.video.url and "tenor.com" in embed.video.url:
                             tenor_url = embed.video.url
 
                         # Check all possible Klipy URL sources
-                        if embed.url and 'klipy.com' in embed.url:
+                        if embed.url and "klipy.com" in embed.url:
                             klipy_url = embed.url
-                        elif embed.image and embed.image.url and 'klipy.com' in embed.image.url:
+                        elif embed.image and embed.image.url and "klipy.com" in embed.image.url:
                             klipy_url = embed.image.url
-                        elif embed.video and embed.video.url and 'klipy.com' in embed.video.url:
+                        elif embed.video and embed.video.url and "klipy.com" in embed.video.url:
                             klipy_url = embed.video.url
 
                         # If we found any Tenor URL, resolve it to get the proper GIF
@@ -153,15 +152,15 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
                             if embed.thumbnail:
                                 embed_copy.set_thumbnail(url=embed.thumbnail.url)
                             if embed.footer:
-                                embed_copy.set_footer(text=embed.footer.text, icon_url=embed.footer.icon_url)
+                                embed_copy.set_footer(
+                                    text=embed.footer.text, icon_url=embed.footer.icon_url
+                                )
                             return embed_copy
-
-
 
             # Check for attachments (uploaded images)
             if message.attachments:
                 for attachment in message.attachments:
-                    if attachment.content_type and attachment.content_type.startswith('image/'):
+                    if attachment.content_type and attachment.content_type.startswith("image/"):
                         # Always delete the user's message since we're re-posting the image
                         try:
                             await message.delete()
@@ -178,12 +177,12 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
                 import re
                 from src.services.image_service import validate_image_url
 
-            # Look for URLs in the message content
-                url_pattern = r'https?://[^\s]+'
+                # Look for URLs in the message content
+                url_pattern = r"https?://[^\s]+"
                 urls = re.findall(url_pattern, message.content.strip())
                 if urls:
                     # Check if it's a Tenor URL - handle differently
-                    if 'tenor.com' in urls[0]:
+                    if "tenor.com" in urls[0]:
                         resolved_embed = await self._resolve_tenor_url(urls[0])
                         if resolved_embed:
                             # Delete the user's message
@@ -193,7 +192,7 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
                                 pass
                             return resolved_embed
                     # Check if it's a Klipy URL - handle differently
-                    elif 'klipy.com' in urls[0]:
+                    elif "klipy.com" in urls[0]:
                         resolved_embed = await self._resolve_klipy_url(urls[0])
                         if resolved_embed:
                             # Delete the user's message
@@ -240,16 +239,17 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
         """
         try:
             import re
+
             tenor_id = None
 
             # Check for HTML URL format: https://tenor.com/view/[slug]-[id]
             # The ID is after the last dash in the URL
-            match = re.search(r'tenor\.com/view/.*-(\d+)(?:$|\?)', url)
+            match = re.search(r"tenor\.com/view/.*-(\d+)(?:$|\?)", url)
             if match:
                 tenor_id = match.group(1)
             else:
                 # Check for media URL format: https://media.tenor.com/[id]/[filename].gif
-                match = re.search(r'media\.tenor\.com/([a-zA-Z0-9]+)/', url)
+                match = re.search(r"media\.tenor\.com/([a-zA-Z0-9]+)/", url)
                 if match:
                     tenor_id = match.group(1)
 
@@ -259,7 +259,7 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
 
             print(f"DEBUG: Extracted Tenor ID: {tenor_id}")
 
-            api_key = os.getenv('TENOR_API_KEY')
+            api_key = os.getenv("TENOR_API_KEY")
             print(f"DEBUG: Tenor API key present: {api_key is not None}")
 
             if not api_key:
@@ -268,15 +268,16 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
 
             # Use Tenor API to get the GIF details
             api_url = "https://tenor.googleapis.com/v2/posts"
-            params = {
-                'ids': tenor_id,
-                'key': api_key
-            }
+            params = {"ids": tenor_id, "key": api_key}
 
-            print(f"DEBUG: Making API call to: {api_url}?{'&'.join(f'{k}={v}' for k,v in params.items())}")
+            print(
+                f"DEBUG: Making API call to: {api_url}?{'&'.join(f'{k}={v}' for k,v in params.items())}"
+            )
 
             # Create a temporary session for the API call
-            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10.0)) as temp_session:
+            async with aiohttp.ClientSession(
+                timeout=aiohttp.ClientTimeout(total=10.0)
+            ) as temp_session:
                 async with temp_session.get(api_url, params=params) as response:
                     if response.status != 200:
                         return None
@@ -294,21 +295,21 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
                         print(f"DEBUG: Invalid response data: {type(data)}")
                         return None
 
-                    if not data.get('results'):
+                    if not data.get("results"):
                         print("DEBUG: No results in Tenor API response")
                         return None
 
-                    result = data['results'][0]
-                    media_formats = result.get('media_formats', {})
+                    result = data["results"][0]
+                    media_formats = result.get("media_formats", {})
                     print(f"DEBUG: Media formats available: {list(media_formats.keys())}")
 
-                    gif_info = media_formats.get('gif')
+                    gif_info = media_formats.get("gif")
 
-                    if not gif_info or not gif_info.get('url'):
+                    if not gif_info or not gif_info.get("url"):
                         print("DEBUG: No GIF info or URL in Tenor response")
                         return None
 
-                    gif_url = gif_info['url']
+                    gif_url = gif_info["url"]
                     print(f"DEBUG: Resolved Tenor GIF URL: {gif_url}")
 
                     # Create embed with the actual GIF
@@ -334,7 +335,7 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
             import re
 
             # Extract slug from URL: https://klipy.com/gifs/{slug}
-            match = re.search(r'klipy\.com/gifs/([^/?#]+)', url)
+            match = re.search(r"klipy\.com/gifs/([^/?#]+)", url)
             if not match:
                 print(f"DEBUG: Could not extract Klipy slug from URL: {url}")
                 return None
@@ -342,7 +343,7 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
             slug = match.group(1)
             print(f"DEBUG: Extracted Klipy slug: {slug}")
 
-            api_key = os.getenv('KLIPY_API_KEY')
+            api_key = os.getenv("KLIPY_API_KEY")
             print(f"DEBUG: Klipy API key present: {api_key is not None}")
 
             if not api_key:
@@ -351,11 +352,13 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
 
             # Use Klipy API to get the GIF details
             api_url = f"https://api.klipy.com/api/v1/{api_key}/gifs/items"
-            params = {'slugs': slug}
+            params = {"slugs": slug}
 
             print(f"DEBUG: Making Klipy API call to: {api_url}?slugs={slug}")
 
-            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10.0)) as temp_session:
+            async with aiohttp.ClientSession(
+                timeout=aiohttp.ClientTimeout(total=10.0)
+            ) as temp_session:
                 async with temp_session.get(api_url, params=params) as response:
                     if response.status != 200:
                         print(f"DEBUG: Klipy API returned status {response.status}")
@@ -373,27 +376,27 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
                         return None
 
                     # API returns nested structure: data.data[] contains items
-                    items = data.get('data', {}).get('data', [])
+                    items = data.get("data", {}).get("data", [])
                     if not items:
                         print("DEBUG: No items in Klipy API response")
                         return None
 
                     item = items[0]
-                    file_info = item.get('file', {})
+                    file_info = item.get("file", {})
                     print(f"DEBUG: Klipy file quality levels: {list(file_info.keys())}")
 
                     # File structure has quality tiers (hd, md, sm, xs) with format objects
                     # Prefer HD quality, fallback through md, sm, xs
                     # Each tier has: gif, webp, jpg, mp4, webm with url field
                     media_url = None
-                    for quality in ['hd', 'md', 'sm', 'xs']:
+                    for quality in ["hd", "md", "sm", "xs"]:
                         quality_info = file_info.get(quality, {})
                         # Prefer GIF, fallback to MP4
-                        if quality_info.get('gif', {}).get('url'):
-                            media_url = quality_info['gif']['url']
+                        if quality_info.get("gif", {}).get("url"):
+                            media_url = quality_info["gif"]["url"]
                             break
-                        elif quality_info.get('mp4', {}).get('url'):
-                            media_url = quality_info['mp4']['url']
+                        elif quality_info.get("mp4", {}).get("url"):
+                            media_url = quality_info["mp4"]["url"]
                             break
 
                     if not media_url:
@@ -440,7 +443,9 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
                         ephemeral=True,
                     )
                 except discord.errors.NotFound:
-                    logger.error("Interaction expired before permission error message", exc_info=True)
+                    logger.error(
+                        "Interaction expired before permission error message", exc_info=True
+                    )
                 except Exception as e:
                     logger.error(f"Failed to send permission error: {e}", exc_info=True)
                 return
@@ -486,7 +491,10 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
 
                 for answer_line in answer_lines:
                     # Check if adding this answer would exceed the limit
-                    if current_length + len(answer_line) + 1 > max_content_length and current_message_parts:
+                    if (
+                        current_length + len(answer_line) + 1 > max_content_length
+                        and current_message_parts
+                    ):
                         # Send current batch
                         messages_to_send.append("\n".join(current_message_parts))
                         current_message_parts = []
@@ -519,7 +527,9 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
 
                         await interaction.followup.send(message, ephemeral=True)
                 except discord.errors.NotFound:
-                    logger.error("Interaction expired before sending previous answers", exc_info=True)
+                    logger.error(
+                        "Interaction expired before sending previous answers", exc_info=True
+                    )
                 except Exception as e:
                     logger.error(f"Failed to send previous answers: {e}", exc_info=True)
             else:
@@ -551,7 +561,9 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
                     dm_lines.append("──────────")
                     for answer in previous_session.answers.values():
                         timestamp_str = answer.timestamp.strftime("%b %d, %I:%M %p")
-                        dm_lines.append(f"**{answer.username}** ({timestamp_str}):\n{answer.text}\n")
+                        dm_lines.append(
+                            f"**{answer.username}** ({timestamp_str}):\n{answer.text}\n"
+                        )
                     dm_lines.append("──────────")
 
                     dm_content = "\n".join(dm_lines)
@@ -572,14 +584,16 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
                         for chunk in chunks:
                             await interaction.user.send(chunk)
                 except Exception as e:
-                    logger.warning(f"Failed to DM admin {interaction.user.id} with archived answers: {e}")
+                    logger.warning(
+                        f"Failed to DM admin {interaction.user.id} with archived answers: {e}"
+                    )
 
             # Reset session and create new one
             answer_service.reset_session(self.guild_id)
-            session = answer_service.create_session(self.guild_id, question_text=self.todays_question.value.strip())
+            session = answer_service.create_session(
+                self.guild_id, question_text=self.todays_question.value.strip()
+            )
             storage_service.save_session(self.guild_id, session)
-
-
 
             # Create comprehensive message content
             message_parts = []
@@ -587,10 +601,15 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
             # Yesterday's results section
             if self.yesterday_answer.value.strip() or self.yesterday_winners.value.strip():
                 if self.yesterday_answer.value.strip():
-                    message_parts.append(f"**Yesterday's Answer...**\n{self.yesterday_answer.value.strip()}")
+                    message_parts.append(
+                        f"**Yesterday's Answer...**\n{self.yesterday_answer.value.strip()}"
+                    )
 
                 winners_text = ""
-                if self.yesterday_winners.value.strip() and self.yesterday_winners.value.strip() != "no winners":
+                if (
+                    self.yesterday_winners.value.strip()
+                    and self.yesterday_winners.value.strip() != "no winners"
+                ):
                     winners_text = f"Congrats to {self.yesterday_winners.value.strip()} your gold has been mailed. Thanks for playing!"
                 else:
                     winners_text = "Unfortunately we had no winners, better luck next time!"
@@ -607,10 +626,7 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
             view = AnswerButton()
 
             # Send the complete message with button
-            question_message = await self.channel.send(
-                content=full_content,
-                view=view
-            )
+            question_message = await self.channel.send(content=full_content, view=view)
 
             # Start background task to watch for image (doesn't block interaction)
             asyncio.create_task(self._watch_for_image_and_edit(question_message, timeout=300.0))
@@ -626,10 +642,7 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
             logger.error(
                 f"Unexpected error in PostQuestionModal for user {interaction.user.id}",
                 exc_info=True,
-                extra={
-                    "guild_id": self.guild_id,
-                    "user_id": interaction.user.id
-                }
+                extra={"guild_id": self.guild_id, "user_id": interaction.user.id},
             )
             try:
                 await interaction.followup.send(
@@ -670,7 +683,7 @@ class AnswerModal(ui.Modal, title="Submit Your Trivia Answer"):
             except Exception as e:
                 logger.error(f"Failed to defer AnswerModal interaction: {e}", exc_info=True)
                 return
-            
+
             # Submit or update answer
             answer, is_update = answer_service.submit_answer(
                 guild_id=self.guild_id,
@@ -710,10 +723,7 @@ class AnswerModal(ui.Modal, title="Submit Your Trivia Answer"):
             logger.error(
                 f"Unexpected error in AnswerModal for user {interaction.user.id}",
                 exc_info=True,
-                extra={
-                    "guild_id": self.guild_id,
-                    "user_id": self.user_id
-                }
+                extra={"guild_id": self.guild_id, "user_id": self.user_id},
             )
             try:
                 await interaction.followup.send(
@@ -773,9 +783,9 @@ class AnswerButton(ui.View):
                 f"Error in submit answer button for user {interaction.user.id}",
                 exc_info=True,
                 extra={
-                    "guild_id": guild_id if 'guild_id' in locals() else None,
-                    "user_id": interaction.user.id
-                }
+                    "guild_id": guild_id if "guild_id" in locals() else None,
+                    "user_id": interaction.user.id,
+                },
             )
             # Check if we can still respond
             try:
@@ -792,7 +802,9 @@ class AnswerButton(ui.View):
             except discord.errors.NotFound:
                 logger.error("Interaction expired before button error message", exc_info=True)
             except Exception as followup_error:
-                logger.error(f"Failed to send button error message: {followup_error}", exc_info=True)
+                logger.error(
+                    f"Failed to send button error message: {followup_error}", exc_info=True
+                )
 
 
 @app_commands.command(
@@ -827,10 +839,7 @@ async def post_question_command(interaction: discord.Interaction) -> None:
         logger.error(
             f"Error in /post-question command for user {interaction.user.id}",
             exc_info=True,
-            extra={
-                "guild_id": interaction.guild_id,
-                "user_id": interaction.user.id
-            }
+            extra={"guild_id": interaction.guild_id, "user_id": interaction.user.id},
         )
         try:
             if not interaction.response.is_done():

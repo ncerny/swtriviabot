@@ -85,7 +85,7 @@ class TriviaSession:
         self.answers.clear()
         self.last_activity = datetime.now(timezone.utc)
 
-    def to_dict(self) -> dict[str, str | dict[str, dict[str, str | bool]]]:
+    def to_dict(self) -> dict[str, str | None | dict[str, dict[str, str | bool]]]:
         """Convert session to dictionary for JSON serialization.
 
         Returns:
@@ -100,7 +100,7 @@ class TriviaSession:
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, str | dict[str, dict[str, str | bool]]]) -> "TriviaSession":
+    def from_dict(cls, data: dict[str, str | None | dict[str, dict[str, str | bool]]]) -> "TriviaSession":
         """Create session from dictionary (JSON deserialization).
 
         Args:
