@@ -5,6 +5,7 @@ import logging
 import os
 import re
 import discord
+from datetime import datetime, timezone
 from discord import app_commands, ui
 from dotenv import load_dotenv
 import aiohttp
@@ -460,6 +461,11 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
             # Get previous answers before resetting
             previous_session = answer_service.get_session(self.guild_id)
 
+            # Archive previous session before reset
+            archived = None
+            if previous_session and previous_session.answers:
+                archived = answer_service.archive_session(self.guild_id)
+
             if previous_session and previous_session.answers:
                 # Format previous answers
                 answer_lines = []
@@ -527,9 +533,50 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
                 except Exception as e:
                     logger.error(f"Failed to send confirmation message: {e}", exc_info=True)
 
+            # DM the admin with archived answers
+            if previous_session and previous_session.answers:
+                try:
+                    dm_lines = []
+                    guild_name = interaction.guild.name if interaction.guild else "Unknown Server"
+                    dm_lines.append(f"📋 **Archived Trivia Answers — {guild_name}**\n")
+                    if archived and archived.question_text:
+                        dm_lines.append(f"**Question:** {archived.question_text}")
+                    dm_lines.append(
+                        f"Session started: {previous_session.created_at.strftime('%b %d, %Y at %I:%M %p UTC')}"
+                    )
+                    dm_lines.append(
+                        f"Archived: {datetime.now(timezone.utc).strftime('%b %d, %Y at %I:%M %p UTC')}"
+                    )
+                    dm_lines.append(f"\n**Answers ({len(previous_session.answers)}):**")
+                    dm_lines.append("──────────")
+                    for answer in previous_session.answers.values():
+                        timestamp_str = answer.timestamp.strftime("%b %d, %I:%M %p")
+                        dm_lines.append(f"**{answer.username}** ({timestamp_str}):\n{answer.text}\n")
+                    dm_lines.append("──────────")
+
+                    dm_content = "\n".join(dm_lines)
+
+                    # Paginate if needed
+                    if len(dm_content) <= 2000:
+                        await interaction.user.send(dm_content)
+                    else:
+                        chunks = []
+                        current = ""
+                        for line in dm_lines:
+                            if len(current) + len(line) + 1 > 1800 and current:
+                                chunks.append(current)
+                                current = ""
+                            current += line + "\n"
+                        if current:
+                            chunks.append(current)
+                        for chunk in chunks:
+                            await interaction.user.send(chunk)
+                except Exception as e:
+                    logger.warning(f"Failed to DM admin {interaction.user.id} with archived answers: {e}")
+
             # Reset session and create new one
             answer_service.reset_session(self.guild_id)
-            session = answer_service.create_session(self.guild_id)
+            session = answer_service.create_session(self.guild_id, question_text=self.todays_question.value.strip())
             storage_service.save_session(self.guild_id, session)
 
 

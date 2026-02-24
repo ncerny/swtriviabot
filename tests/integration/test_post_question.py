@@ -1,7 +1,8 @@
 """Integration tests for post_question command and modals."""
 
 import pytest
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, Mock, MagicMock, patch
+from datetime import datetime, timezone
 import discord
 
 from src.commands.post_question import (
@@ -11,6 +12,9 @@ from src.commands.post_question import (
     AnswerButton,
 )
 from src.services import answer_service, storage_service
+from src.models.session import TriviaSession
+from src.models.answer import Answer
+from src.models.archived_session import ArchivedSession
 
 
 @pytest.mark.asyncio
@@ -341,3 +345,130 @@ async def test_answer_button_persistent_view():
     for item in button.children:
         if isinstance(item, discord.ui.Button):
             assert item.custom_id == "trivia:submit_answer"
+
+
+class TestPostQuestionArchiveAndDM:
+    """Tests for archive + DM behavior during post-question."""
+
+    @pytest.fixture
+    async def modal(self, mock_channel):
+        modal = PostQuestionModal(guild_id=987654321098765432, channel=mock_channel)
+        modal.yesterday_answer = MagicMock()
+        modal.yesterday_answer.value = ""
+        modal.yesterday_winners = MagicMock()
+        modal.yesterday_winners.value = ""
+        modal.todays_question = MagicMock()
+        modal.todays_question.value = "New question?"
+        return modal
+
+    @patch('src.commands.post_question.answer_service')
+    @patch('src.commands.post_question.storage_service')
+    async def test_archives_session_before_reset(
+        self, mock_storage, mock_answer_svc, modal, mock_interaction
+    ):
+        now = datetime.now(timezone.utc)
+        prev_session = TriviaSession(guild_id="987654321098765432")
+        prev_session.add_or_update_answer(Answer(
+            user_id="u1", username="Alice", text="answer", timestamp=now
+        ))
+        mock_answer_svc.get_session.return_value = prev_session
+
+        archived = ArchivedSession(
+            guild_id="987654321098765432",
+            question_text="Old Q?",
+            answers=prev_session.answers,
+            created_at=now,
+            archived_at=now,
+        )
+        mock_answer_svc.archive_session.return_value = archived
+        mock_answer_svc.create_session.return_value = TriviaSession(
+            guild_id="987654321098765432"
+        )
+
+        await modal.on_submit(mock_interaction)
+
+        mock_answer_svc.archive_session.assert_called_once_with("987654321098765432")
+
+    @patch('src.commands.post_question.answer_service')
+    @patch('src.commands.post_question.storage_service')
+    async def test_dms_admin_on_archive(
+        self, mock_storage, mock_answer_svc, modal, mock_interaction
+    ):
+        now = datetime.now(timezone.utc)
+        prev_session = TriviaSession(guild_id="987654321098765432")
+        prev_session.add_or_update_answer(Answer(
+            user_id="u1", username="Alice", text="answer", timestamp=now
+        ))
+        mock_answer_svc.get_session.return_value = prev_session
+
+        archived = ArchivedSession(
+            guild_id="987654321098765432",
+            question_text="Old Q?",
+            answers=prev_session.answers,
+            created_at=now,
+            archived_at=now,
+        )
+        mock_answer_svc.archive_session.return_value = archived
+        mock_answer_svc.create_session.return_value = TriviaSession(
+            guild_id="987654321098765432"
+        )
+
+        mock_interaction.user.send = AsyncMock()
+
+        await modal.on_submit(mock_interaction)
+
+        mock_interaction.user.send.assert_called()
+        dm_content = mock_interaction.user.send.call_args[0][0]
+        assert "Alice" in dm_content
+        assert "answer" in dm_content
+
+    @patch('src.commands.post_question.answer_service')
+    @patch('src.commands.post_question.storage_service')
+    async def test_dm_failure_does_not_block_reset(
+        self, mock_storage, mock_answer_svc, modal, mock_interaction
+    ):
+        now = datetime.now(timezone.utc)
+        prev_session = TriviaSession(guild_id="987654321098765432")
+        prev_session.add_or_update_answer(Answer(
+            user_id="u1", username="Alice", text="answer", timestamp=now
+        ))
+        mock_answer_svc.get_session.return_value = prev_session
+
+        archived = ArchivedSession(
+            guild_id="987654321098765432",
+            question_text="Old Q?",
+            answers=prev_session.answers,
+            created_at=now,
+            archived_at=now,
+        )
+        mock_answer_svc.archive_session.return_value = archived
+        mock_answer_svc.create_session.return_value = TriviaSession(
+            guild_id="987654321098765432"
+        )
+
+        # DM fails
+        mock_interaction.user.send = AsyncMock(side_effect=discord.Forbidden(
+            MagicMock(status=403), "Cannot send messages to this user"
+        ))
+
+        await modal.on_submit(mock_interaction)
+
+        # Reset still happened
+        mock_answer_svc.reset_session.assert_called_once()
+
+    @patch('src.commands.post_question.answer_service')
+    @patch('src.commands.post_question.storage_service')
+    async def test_new_session_gets_question_text(
+        self, mock_storage, mock_answer_svc, modal, mock_interaction
+    ):
+        mock_answer_svc.get_session.return_value = None
+        mock_answer_svc.create_session.return_value = TriviaSession(
+            guild_id="987654321098765432"
+        )
+
+        await modal.on_submit(mock_interaction)
+
+        # create_session should be called with question_text
+        mock_answer_svc.create_session.assert_called_once_with(
+            "987654321098765432", question_text="New question?"
+        )
