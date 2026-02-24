@@ -45,6 +45,7 @@ htmlcov/
 coverage.xml
 *.cover
 .hypothesis/
+example_answers.json
 
 # Type checking
 .mypy_cache/

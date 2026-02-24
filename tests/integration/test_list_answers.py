@@ -57,29 +57,42 @@ async def test_list_answers_with_submissions(mock_interaction):
 
 
 @pytest.mark.asyncio
-async def test_list_answers_truncates_long_content(mock_interaction):
-    """Test that very long answer lists are truncated."""
+async def test_list_answers_splits_long_content(mock_interaction):
+    """Test that very long answer lists are split into multiple messages."""
     guild_id = str(mock_interaction.guild_id)
-    
+
     with patch('src.services.answer_service.storage_service') as mock_storage:
         # Create session
         session = TriviaSession(guild_id=guild_id)
-        
+
         # Mock storage to return the session when loading
         mock_storage.load_session.return_value = session
-        
+
         # Now submit many long answers (which will use the mocked session)
         for i in range(20):
             long_answer = "A" * 100  # 100 char answer
             answer_service.submit_answer(guild_id, f"user{i}", f"User{i}", long_answer)
-        
+
         await list_answers_command.callback(mock_interaction)
-        
-        # Verify truncation
-        call_args = mock_interaction.followup.send.call_args
-        message = call_args[0][0]
-        assert "truncated due to length" in message
-        assert len(message) <= 2000  # Discord limit
+
+        # Verify multiple messages were sent
+        assert mock_interaction.followup.send.call_count > 1
+
+        # Verify all messages are under Discord limit
+        for call in mock_interaction.followup.send.call_args_list:
+            message = call[0][0]
+            assert len(message) <= 2000
+            assert call[1]["ephemeral"] is True
+
+        # Verify continuation markers in messages
+        first_message = mock_interaction.followup.send.call_args_list[0][0][0]
+        last_message = mock_interaction.followup.send.call_args_list[-1][0][0]
+
+        # First message should have header
+        assert "Current Session Answers" in first_message
+
+        # Last message should have footer
+        assert "Total answers: 20" in last_message
 
 
 @pytest.mark.asyncio

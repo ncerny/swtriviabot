@@ -1,6 +1,7 @@
 """Main Discord bot entry point for the Trivia Bot."""
 
 import asyncio
+import json
 import logging
 import os
 import signal
@@ -51,6 +52,7 @@ DISCORD_BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 DISCORD_TEST_GUILD_ID = os.getenv("DISCORD_TEST_GUILD_ID")
 BOT_INSTANCE_ID = os.getenv("BOT_INSTANCE_ID", str(uuid.uuid4()))
 DEV_MODE = os.getenv("DEV_MODE", "false").lower() == "true"
+LEADER_ELECTION_ENABLED = os.getenv("LEADER_ELECTION_ENABLED", "true").lower() == "true"
 
 
 if not DISCORD_BOT_TOKEN:
@@ -73,6 +75,7 @@ tree.add_command(post_question_command)
 # Leader Election Globals
 HEARTBEAT_INTERVAL = 10  # Seconds
 LOCK_EXPIRY = 30  # Seconds
+HEARTBEAT_MAX_FAILURES = 3  # Consecutive failures before SIGTERM
 _heartbeat_stop_event = threading.Event()
 
 
@@ -159,15 +162,73 @@ def release_lock() -> None:
 
 
 def heartbeat_loop() -> None:
-    """Background thread to refresh lock."""
+    """Background thread to refresh lock.
+
+    Tolerates up to HEARTBEAT_MAX_FAILURES consecutive failures before
+    treating the lock as lost.  This prevents transient Firestore errors
+    (e.g. expired transactions) from killing a single-instance bot.
+    """
     logger.info("Starting heartbeat loop")
+    consecutive_failures = 0
     while not _heartbeat_stop_event.is_set():
-        if not acquire_lock():
-            logger.error("Lost leader lock during heartbeat! Shutting down...")
-            # We lost the lock, we should probably exit to be safe
-            os.kill(os.getpid(), signal.SIGTERM)
-            break
+        if acquire_lock():
+            consecutive_failures = 0
+        else:
+            consecutive_failures += 1
+            logger.warning(
+                "Heartbeat failed to acquire lock "
+                f"({consecutive_failures}/{HEARTBEAT_MAX_FAILURES})"
+            )
+            if consecutive_failures >= HEARTBEAT_MAX_FAILURES:
+                logger.error(
+                    "Lost leader lock after %d consecutive failures! Shutting down...",
+                    HEARTBEAT_MAX_FAILURES,
+                )
+                os.kill(os.getpid(), signal.SIGTERM)
+                break
         time.sleep(HEARTBEAT_INTERVAL)
+
+
+def load_example_answers() -> None:
+    """Load example answers from example_answers.json if in DEV_MODE and DISCORD_TEST_GUILD_ID is set.
+
+    The guild_id from the JSON file is ignored and replaced with DISCORD_TEST_GUILD_ID.
+    This ensures test data only loads into the test guild.
+    """
+    if not DEV_MODE:
+        return
+
+    if not DISCORD_TEST_GUILD_ID:
+        logger.info("DISCORD_TEST_GUILD_ID not set, skipping example data load")
+        return
+
+    example_file = Path(__file__).parent.parent / "example_answers.json"
+
+    if not example_file.exists():
+        logger.info("No example_answers.json found, skipping example data load")
+        return
+
+    try:
+        logger.info(f"📝 DEV_MODE: Loading example answers from {example_file}")
+
+        with open(example_file, 'r') as f:
+            data = json.load(f)
+
+        # Use TriviaSession.from_dict to parse the JSON
+        from src.models.session import TriviaSession
+        session = TriviaSession.from_dict(data)
+
+        # Override the guild_id with DISCORD_TEST_GUILD_ID to ensure data goes to test guild
+        test_guild_id = str(DISCORD_TEST_GUILD_ID)
+        session.guild_id = test_guild_id
+
+        # Save the session using storage_service (requires guild_id and session)
+        storage_service.save_session(test_guild_id, session)
+
+        logger.info(f"✅ Loaded {len(session.answers)} example answers for test guild {test_guild_id}")
+
+    except Exception as e:
+        logger.error(f"Failed to load example answers: {e}", exc_info=True)
 
 
 @client.event
@@ -176,10 +237,10 @@ async def on_ready() -> None:
     user_info = f"{client.user} (ID: {client.user.id})" if client.user else "Unknown"
     logger.info(f"Logged in as {user_info}")
     print(f"✅ Logged in as {user_info}")
-    
+
     # Register persistent views
     client.add_view(AnswerButton())
-    
+
     # Sync commands
     try:
         if DISCORD_TEST_GUILD_ID:
@@ -192,6 +253,9 @@ async def on_ready() -> None:
             logger.info("Synced commands globally")
     except Exception as e:
         logger.error(f"Failed to sync commands: {e}")
+
+    # Load example answers if in DEV_MODE
+    load_example_answers()
 
     logger.info("Bot is ready!")
 
@@ -223,13 +287,14 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
 def graceful_shutdown(signum: int, frame: object) -> NoReturn:
     """Handle graceful shutdown."""
     logger.info(f"Received signal {signum}, shutting down...")
-    
+
     # Stop heartbeat
     _heartbeat_stop_event.set()
-    
-    # Release lock
-    release_lock()
-    
+
+    # Release lock (only if leader election is enabled)
+    if LEADER_ELECTION_ENABLED:
+        release_lock()
+
     sys.exit(0)
 
 
@@ -253,19 +318,22 @@ def main() -> None:
     except Exception as e:
         logger.error(f"Migration failed: {e}")
 
-    # 2. Leader Election Loop
-    logger.info("Entering leader election loop...")
-    while True:
-        if acquire_lock():
-            logger.info("👑 Acquired leader lock! Starting bot...")
-            break
-        else:
-            logger.info("💤 Standby: Leader lock held by another instance. Retrying in 15s...")
-            time.sleep(15)
+    # 2. Leader Election (skip if disabled for single-instance deployments)
+    if LEADER_ELECTION_ENABLED:
+        logger.info("Entering leader election loop...")
+        while True:
+            if acquire_lock():
+                logger.info("👑 Acquired leader lock! Starting bot...")
+                break
+            else:
+                logger.info("💤 Standby: Leader lock held by another instance. Retrying in 15s...")
+                time.sleep(15)
 
-    # 3. Start Heartbeat
-    heartbeat_thread = threading.Thread(target=heartbeat_loop, daemon=True)
-    heartbeat_thread.start()
+        # 3. Start Heartbeat
+        heartbeat_thread = threading.Thread(target=heartbeat_loop, daemon=True)
+        heartbeat_thread.start()
+    else:
+        logger.info("Leader election disabled, starting bot immediately")
 
     # 4. Run Bot
     try:
@@ -273,8 +341,9 @@ def main() -> None:
     except Exception as e:
         logger.error(f"Fatal error: {e}")
     finally:
-        _heartbeat_stop_event.set()
-        release_lock()
+        if LEADER_ELECTION_ENABLED:
+            _heartbeat_stop_event.set()
+            release_lock()
 
 
 if __name__ == "__main__":

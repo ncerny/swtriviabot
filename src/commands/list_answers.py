@@ -70,21 +70,53 @@ async def list_answers_command(interaction: discord.Interaction) -> None:
             answer_lines.append(
                 f"**{answer.username}** ({timestamp_str}):\n{answer.text}\n"
             )
-        
-        answers_text = "\n".join(answer_lines)
-        
-        # Truncate if too long (Discord has 2000 char limit per message)
-        if len(answers_text) > 1800:
-            answers_text = answers_text[:1800] + "\n\n_(truncated due to length)_"
-        
-        formatted_message = (
-            f"📋 **Current Session Answers**\n\n"
-            f"{answers_text}\n"
-            f"_Total answers: {len(session.answers)}_"
-        )
 
+        # Split into multiple messages if needed (Discord has 2000 char limit per message)
+        # Keep header and footer separate from answers
+        header = f"📋 **Current Session Answers**\n\n"
+        footer = f"\n_Total answers: {len(session.answers)}_"
+
+        # Calculate available space for answers (leaving room for header/footer)
+        max_content_length = 1800  # Conservative limit
+
+        messages_to_send = []
+        current_message_parts = []
+        current_length = 0
+
+        for answer_line in answer_lines:
+            # Check if adding this answer would exceed the limit
+            if current_length + len(answer_line) + 1 > max_content_length and current_message_parts:
+                # Send current batch
+                messages_to_send.append("\n".join(current_message_parts))
+                current_message_parts = []
+                current_length = 0
+
+            current_message_parts.append(answer_line)
+            current_length += len(answer_line) + 1  # +1 for newline
+
+        # Add remaining answers
+        if current_message_parts:
+            messages_to_send.append("\n".join(current_message_parts))
+
+        # Send all message parts
         try:
-            await interaction.followup.send(formatted_message, ephemeral=True)
+            for i, answers_text in enumerate(messages_to_send):
+                if i == 0:
+                    # First message gets header
+                    message = header + answers_text
+                    if len(messages_to_send) == 1:
+                        # Only one message, add footer too
+                        message += footer
+                    else:
+                        message += f"\n\n_(continued in next message...)_"
+                elif i == len(messages_to_send) - 1:
+                    # Last message gets footer
+                    message = f"_(continued)_\n\n{answers_text}{footer}"
+                else:
+                    # Middle messages
+                    message = f"_(continued)_\n\n{answers_text}\n\n_(continued in next message...)_"
+
+                await interaction.followup.send(message, ephemeral=True)
         except discord.errors.NotFound:
             logger.error("Interaction expired before sending answers", exc_info=True)
         except Exception as e:
