@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from src.services import storage_service
 from src.models.session import TriviaSession
 from src.models.answer import Answer
+from src.models.archived_session import ArchivedSession
 
 
 def test_save_session_to_firestore(mock_firestore):
@@ -283,7 +284,141 @@ def test_migrate_local_data_renames_migrated_files(mock_get_db, mock_data_dir, t
     
     with patch('src.services.storage_service.save_session'):
         storage_service.migrate_local_data()
-        
+
         # Original file should be renamed
         assert not test_file.exists()
         assert (tmp_path / "test_guild.json.migrated").exists()
+
+
+class TestSaveArchivedSession:
+    """Tests for save_archived_session."""
+
+    def test_saves_to_correct_collection(self, mock_firestore):
+        now = datetime.now(timezone.utc)
+        archived = ArchivedSession(
+            guild_id="guild123",
+            question_text="Q?",
+            answers={},
+            created_at=now,
+            archived_at=now,
+        )
+
+        storage_service.save_archived_session(archived)
+
+        mock_firestore['db'].collection.assert_called_with(
+            f"session_archives{storage_service.COLLECTION_SUFFIX}"
+        )
+        mock_firestore['collection'].document.assert_called_with(archived.document_id())
+        mock_firestore['document'].set.assert_called_once()
+
+    @patch('src.services.storage_service._get_db')
+    def test_handles_none_db(self, mock_get_db):
+        mock_get_db.return_value = None
+        now = datetime.now(timezone.utc)
+        archived = ArchivedSession(
+            guild_id="guild123",
+            question_text="Q?",
+            answers={},
+            created_at=now,
+            archived_at=now,
+        )
+        # Should not raise
+        storage_service.save_archived_session(archived)
+
+
+class TestLoadArchivedSessions:
+    """Tests for load_archived_sessions."""
+
+    def test_returns_empty_list_when_no_archives(self, mock_firestore):
+        mock_query = MagicMock()
+        mock_query.order_by.return_value = mock_query
+        mock_query.where.return_value = mock_query
+        mock_query.limit.return_value = mock_query
+        mock_query.stream.return_value = []
+        mock_firestore['db'].collection.return_value = mock_query
+
+        result = storage_service.load_archived_sessions("guild123")
+        assert result == []
+
+    def test_returns_archived_sessions(self, mock_firestore):
+        now = datetime.now(timezone.utc)
+        mock_doc = MagicMock()
+        mock_doc.to_dict.return_value = {
+            "guild_id": "guild123",
+            "question_text": "Q?",
+            "answers": {},
+            "created_at": now.isoformat(),
+            "archived_at": now.isoformat(),
+        }
+
+        mock_query = MagicMock()
+        mock_query.where.return_value = mock_query
+        mock_query.order_by.return_value = mock_query
+        mock_query.limit.return_value = mock_query
+        mock_query.stream.return_value = [mock_doc]
+        mock_firestore['db'].collection.return_value = mock_query
+
+        result = storage_service.load_archived_sessions("guild123", limit=3)
+        assert len(result) == 1
+        assert result[0].guild_id == "guild123"
+
+    @patch('src.services.storage_service._get_db')
+    def test_handles_none_db(self, mock_get_db):
+        mock_get_db.return_value = None
+        result = storage_service.load_archived_sessions("guild123")
+        assert result == []
+
+
+class TestPruneArchivedSessions:
+    """Tests for prune_archived_sessions."""
+
+    def test_deletes_excess_archives(self, mock_firestore):
+        now = datetime.now(timezone.utc)
+
+        # Create 4 mock docs (keep=3 means 1 should be deleted)
+        mock_docs = []
+        for i in range(4):
+            doc = MagicMock()
+            doc.id = f"guild123_{i}"
+            doc.reference = MagicMock()
+            mock_docs.append(doc)
+
+        mock_query = MagicMock()
+        mock_query.where.return_value = mock_query
+        mock_query.order_by.return_value = mock_query
+        mock_query.stream.return_value = mock_docs
+        mock_firestore['db'].collection.return_value = mock_query
+
+        storage_service.prune_archived_sessions("guild123", keep=3)
+
+        # The 4th doc (index 3) should be deleted
+        mock_docs[3].reference.delete.assert_called_once()
+        # The first 3 should NOT be deleted
+        mock_docs[0].reference.delete.assert_not_called()
+        mock_docs[1].reference.delete.assert_not_called()
+        mock_docs[2].reference.delete.assert_not_called()
+
+    def test_no_deletion_when_under_limit(self, mock_firestore):
+        mock_docs = []
+        for i in range(2):
+            doc = MagicMock()
+            doc.id = f"guild123_{i}"
+            doc.reference = MagicMock()
+            mock_docs.append(doc)
+
+        mock_query = MagicMock()
+        mock_query.where.return_value = mock_query
+        mock_query.order_by.return_value = mock_query
+        mock_query.stream.return_value = mock_docs
+        mock_firestore['db'].collection.return_value = mock_query
+
+        storage_service.prune_archived_sessions("guild123", keep=3)
+
+        for doc in mock_docs:
+            doc.reference.delete.assert_not_called()
+
+    @patch('src.services.storage_service._get_db')
+    def test_handles_none_db(self, mock_get_db):
+        mock_get_db.return_value = None
+        # Should not raise
+        storage_service.prune_archived_sessions("guild123", keep=3)
