@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 
 from src.services import answer_service
 from src.models.answer import Answer
+from src.models.archived_session import ArchivedSession
 from src.models.session import TriviaSession
 
 
@@ -165,3 +166,65 @@ def test_submit_answer_saves_to_storage(mock_storage):
     call_args = mock_storage.save_session.call_args
     assert call_args[0][0] == guild_id
     assert isinstance(call_args[0][1], TriviaSession)
+
+
+class TestArchiveSession:
+    """Tests for archive_session."""
+
+    @patch('src.services.answer_service.storage_service')
+    def test_archives_session_with_answers(self, mock_storage):
+        now = datetime.now(timezone.utc)
+        session = TriviaSession(
+            guild_id="guild123",
+            question_text="What is 2+2?",
+            created_at=now,
+            last_activity=now,
+        )
+        session.add_or_update_answer(Answer(
+            user_id="user1", username="Alice", text="4", timestamp=now
+        ))
+        mock_storage.load_session.return_value = session
+
+        result = answer_service.archive_session("guild123")
+
+        assert result is not None
+        assert result.guild_id == "guild123"
+        assert result.question_text == "What is 2+2?"
+        assert len(result.answers) == 1
+        assert result.answers["user1"].text == "4"
+        mock_storage.save_archived_session.assert_called_once()
+        mock_storage.prune_archived_sessions.assert_called_once_with("guild123", keep=3)
+
+    @patch('src.services.answer_service.storage_service')
+    def test_returns_none_when_no_session(self, mock_storage):
+        mock_storage.load_session.return_value = None
+
+        result = answer_service.archive_session("guild123")
+
+        assert result is None
+        mock_storage.save_archived_session.assert_not_called()
+
+    @patch('src.services.answer_service.storage_service')
+    def test_returns_none_when_no_answers(self, mock_storage):
+        session = TriviaSession(guild_id="guild123")
+        mock_storage.load_session.return_value = session
+
+        result = answer_service.archive_session("guild123")
+
+        assert result is None
+        mock_storage.save_archived_session.assert_not_called()
+
+    @patch('src.services.answer_service.storage_service')
+    def test_handles_missing_question_text(self, mock_storage):
+        """Old sessions without question_text should archive with empty string."""
+        now = datetime.now(timezone.utc)
+        session = TriviaSession(guild_id="guild123", created_at=now, last_activity=now)
+        session.add_or_update_answer(Answer(
+            user_id="user1", username="Alice", text="answer", timestamp=now
+        ))
+        mock_storage.load_session.return_value = session
+
+        result = answer_service.archive_session("guild123")
+
+        assert result is not None
+        assert result.question_text == ""

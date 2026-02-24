@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from src.models.answer import Answer
+from src.models.archived_session import ArchivedSession
 from src.models.session import TriviaSession
 from src.services import storage_service
 from src.utils.validators import validate_answer_text
@@ -94,16 +95,17 @@ def reset_session(guild_id: str) -> None:
     storage_service.delete_session(guild_id)
 
 
-def create_session(guild_id: str) -> TriviaSession:
+def create_session(guild_id: str, question_text: Optional[str] = None) -> TriviaSession:
     """Create a new trivia session for a guild.
 
     Args:
         guild_id: Discord server/guild ID
+        question_text: The trivia question being asked
 
     Returns:
         The newly created TriviaSession
     """
-    session = TriviaSession(guild_id=guild_id)
+    session = TriviaSession(guild_id=guild_id, question_text=question_text)
     storage_service.save_session(guild_id, session)
     return session
 
@@ -119,8 +121,38 @@ def get_all_sessions() -> dict[str, TriviaSession]:
 
 def load_sessions(sessions: dict[str, TriviaSession]) -> None:
     """Load sessions into memory.
-    
+
     Deprecated: No longer needed as we read from Firestore directly.
     Kept for compatibility if called by bot.py before update.
     """
     pass
+
+
+def archive_session(guild_id: str) -> Optional[ArchivedSession]:
+    """Archive the current session before reset.
+
+    Saves a snapshot of the session to the archive collection,
+    then prunes old archives beyond the retention limit.
+
+    Args:
+        guild_id: Discord server/guild ID
+
+    Returns:
+        ArchivedSession if archived, None if nothing to archive
+    """
+    session = storage_service.load_session(guild_id)
+    if not session or not session.answers:
+        return None
+
+    archived = ArchivedSession(
+        guild_id=guild_id,
+        question_text=session.question_text or "",
+        answers=dict(session.answers),
+        created_at=session.created_at,
+        archived_at=datetime.now(timezone.utc),
+    )
+
+    storage_service.save_archived_session(archived)
+    storage_service.prune_archived_sessions(guild_id, keep=3)
+
+    return archived
