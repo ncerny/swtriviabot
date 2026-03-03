@@ -3,6 +3,7 @@
 import json
 import logging
 import os
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -11,6 +12,7 @@ from firebase_admin import credentials, firestore
 
 from src.models.session import TriviaSession
 from src.models.archived_session import ArchivedSession
+from src.models.weekly_summary_subscription import WeeklySummarySubscription
 
 logger = logging.getLogger(__name__)
 
@@ -262,3 +264,51 @@ def prune_archived_sessions(guild_id: str, keep: int = 3) -> None:
             doc.reference.delete()
     except Exception as e:
         logger.error(f"Error pruning archived sessions for guild {guild_id}: {e}")
+
+
+def save_weekly_summary_subscription(subscription: WeeklySummarySubscription) -> None:
+    """Persist a weekly summary subscription."""
+    db = _get_db()
+    if not db:
+        return
+
+    try:
+        collection = f"weekly_summary_subscriptions{COLLECTION_SUFFIX}"
+        db.collection(collection).document(subscription.document_id()).set(subscription.to_dict())
+    except Exception as e:
+        logger.error(
+            "Error saving weekly summary subscription for guild %s user %s: %s",
+            subscription.guild_id,
+            subscription.user_id,
+            e,
+        )
+        raise
+
+
+def load_due_weekly_summary_subscriptions(
+    now: datetime,
+    limit: int = 50,
+) -> list[WeeklySummarySubscription]:
+    """Load subscriptions whose next_send_at is due."""
+    db = _get_db()
+    if not db:
+        return []
+
+    try:
+        collection = f"weekly_summary_subscriptions{COLLECTION_SUFFIX}"
+        query = (
+            db.collection(collection)
+            .where("next_send_at", "<=", now.isoformat())
+            .order_by("next_send_at", direction=firestore.Query.ASCENDING)
+            .limit(limit)
+        )
+        results = []
+        for doc in query.stream():
+            try:
+                results.append(WeeklySummarySubscription.from_dict(doc.to_dict()))
+            except Exception as e:
+                logger.error(f"Error parsing weekly summary subscription {doc.id}: {e}")
+        return results
+    except Exception as e:
+        logger.error(f"Error loading due weekly summary subscriptions: {e}")
+        return []

@@ -19,6 +19,7 @@ from dotenv import load_dotenv
 # Add parent directory to path to allow imports
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Load environment variables from .env file in project root
@@ -28,14 +29,21 @@ load_dotenv(dotenv_path=env_path)
 
 # Verify .env was loaded (for debugging)
 import os
+
 _dev_mode_check = os.getenv("DEV_MODE", "not_set")
 print(f"[STARTUP] .env file path: {env_path}")
 print(f"[STARTUP] .env file exists: {env_path.exists()}")
 print(f"[STARTUP] DEV_MODE from environment: '{_dev_mode_check}'")
 
 from src.services import answer_service, storage_service
-from src.commands.list_answers import list_answers_command
-from src.commands.post_question import post_question_command, AnswerButton
+from src.commands.list_answers import list_answers_command, list_answers_alias_command
+from src.commands.post_question import (
+    post_question_command,
+    post_question_alias_command,
+    AnswerButton,
+)
+from src.commands.weekly_summary import weekly_summary_subscribe_command
+from src.services import weekly_summary_service
 from src.utils.performance import get_metrics
 from src.utils.resource_monitor import get_resource_monitor
 
@@ -70,13 +78,28 @@ tree = app_commands.CommandTree(client)
 
 # Register commands
 tree.add_command(list_answers_command)
+tree.add_command(list_answers_alias_command)
 tree.add_command(post_question_command)
+tree.add_command(post_question_alias_command)
+tree.add_command(weekly_summary_subscribe_command)
 
 # Leader Election Globals
 HEARTBEAT_INTERVAL = 10  # Seconds
 LOCK_EXPIRY = 30  # Seconds
 HEARTBEAT_MAX_FAILURES = 3  # Consecutive failures before SIGTERM
 _heartbeat_stop_event = threading.Event()
+_weekly_summary_task: asyncio.Task | None = None
+
+
+async def weekly_summary_loop() -> None:
+    """Background loop that sends due weekly summary DMs."""
+    logger.info("Starting weekly summary loop")
+    while not client.is_closed():
+        try:
+            await weekly_summary_service.process_due_subscriptions(client)
+        except Exception as e:
+            logger.error("Weekly summary loop error: %s", e, exc_info=True)
+        await asyncio.sleep(1800)
 
 
 def _get_firestore_db():
@@ -93,11 +116,12 @@ def acquire_lock() -> bool:
 
     # Use the same collection suffix as storage_service for isolation
     from src.services.storage_service import COLLECTION_SUFFIX
+
     collection_name = f"bot_status{COLLECTION_SUFFIX}"
     lock_ref = db.collection(collection_name).document("leader")
-    
+
     logger.debug(f"Attempting to acquire lock from collection: {collection_name}")
-    
+
     try:
         from firebase_admin import firestore
         from datetime import timedelta
@@ -107,19 +131,17 @@ def acquire_lock() -> bool:
         def update_in_transaction(transaction, ref):
             snapshot = ref.get(transaction=transaction)
             now = datetime.now(timezone.utc)
-            
+
             if snapshot.exists:
                 data = snapshot.to_dict()
                 expires_at = data.get("expires_at")
                 current_leader = data.get("instance_id")
-                
+
                 # If lock is held by us, refresh it
                 if current_leader == BOT_INSTANCE_ID:
-                    transaction.update(ref, {
-                        "expires_at": now + timedelta(seconds=LOCK_EXPIRY)
-                    })
+                    transaction.update(ref, {"expires_at": now + timedelta(seconds=LOCK_EXPIRY)})
                     return True
-                
+
                 # If lock is valid and not us, fail
                 if expires_at:
                     # Convert Firestore timestamp to datetime if needed
@@ -128,16 +150,19 @@ def acquire_lock() -> bool:
                         return False
 
             # Lock is free or expired, take it
-            transaction.set(ref, {
-                "instance_id": BOT_INSTANCE_ID,
-                "expires_at": now + timedelta(seconds=LOCK_EXPIRY),
-                "acquired_at": now
-            })
+            transaction.set(
+                ref,
+                {
+                    "instance_id": BOT_INSTANCE_ID,
+                    "expires_at": now + timedelta(seconds=LOCK_EXPIRY),
+                    "acquired_at": now,
+                },
+            )
             return True
-        
+
         transaction = db.transaction()
         return update_in_transaction(transaction, lock_ref)
-        
+
     except Exception as e:
         logger.error(f"Error acquiring lock: {e}")
         return False
@@ -151,6 +176,7 @@ def release_lock() -> None:
 
     try:
         from src.services.storage_service import COLLECTION_SUFFIX
+
         lock_ref = db.collection(f"bot_status{COLLECTION_SUFFIX}").document("leader")
         # Only delete if we are the owner
         doc = lock_ref.get()
@@ -211,11 +237,12 @@ def load_example_answers() -> None:
     try:
         logger.info(f"📝 DEV_MODE: Loading example answers from {example_file}")
 
-        with open(example_file, 'r') as f:
+        with open(example_file, "r") as f:
             data = json.load(f)
 
         # Use TriviaSession.from_dict to parse the JSON
         from src.models.session import TriviaSession
+
         session = TriviaSession.from_dict(data)
 
         # Override the guild_id with DISCORD_TEST_GUILD_ID to ensure data goes to test guild
@@ -225,7 +252,9 @@ def load_example_answers() -> None:
         # Save the session using storage_service (requires guild_id and session)
         storage_service.save_session(test_guild_id, session)
 
-        logger.info(f"✅ Loaded {len(session.answers)} example answers for test guild {test_guild_id}")
+        logger.info(
+            f"✅ Loaded {len(session.answers)} example answers for test guild {test_guild_id}"
+        )
 
     except Exception as e:
         logger.error(f"Failed to load example answers: {e}", exc_info=True)
@@ -240,6 +269,10 @@ async def on_ready() -> None:
 
     # Register persistent views
     client.add_view(AnswerButton())
+
+    global _weekly_summary_task
+    if _weekly_summary_task is None or _weekly_summary_task.done():
+        _weekly_summary_task = asyncio.create_task(weekly_summary_loop())
 
     # Sync commands
     try:
@@ -267,7 +300,9 @@ async def on_interaction(interaction: discord.Interaction) -> None:
 
 
 @tree.error
-async def on_app_command_error(interaction: discord.Interaction, error: app_commands.AppCommandError) -> None:
+async def on_app_command_error(
+    interaction: discord.Interaction, error: app_commands.AppCommandError
+) -> None:
     logger.error(f"Command error: {error}", exc_info=True)
     try:
         msg = "❌ Something went wrong"
@@ -275,7 +310,7 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
             msg = "❌ You don't have permission"
         elif isinstance(error, app_commands.CommandOnCooldown):
             msg = f"❌ Cooldown: {error.retry_after:.1f}s"
-            
+
         if interaction.response.is_done():
             await interaction.followup.send(msg, ephemeral=True)
         else:
@@ -291,6 +326,10 @@ def graceful_shutdown(signum: int, frame: object) -> NoReturn:
     # Stop heartbeat
     _heartbeat_stop_event.set()
 
+    global _weekly_summary_task
+    if _weekly_summary_task and not _weekly_summary_task.done():
+        _weekly_summary_task.cancel()
+
     # Release lock (only if leader election is enabled)
     if LEADER_ELECTION_ENABLED:
         release_lock()
@@ -305,13 +344,13 @@ signal.signal(signal.SIGINT, graceful_shutdown)
 def main() -> None:
     """Main entry point."""
     from src.services.storage_service import COLLECTION_SUFFIX, DEV_MODE as STORAGE_DEV_MODE
-    
+
     mode_str = "TEST/DEV" if STORAGE_DEV_MODE else "PRODUCTION"
     logger.info(f"Starting Discord Trivia Bot (Instance: {BOT_INSTANCE_ID})")
     logger.info(f"🔧 Running in {mode_str} mode (DEV_MODE={STORAGE_DEV_MODE})")
     logger.info(f"📦 Using collection suffix: '{COLLECTION_SUFFIX}'")
     logger.info(f"📊 Collections: sessions{COLLECTION_SUFFIX}, bot_status{COLLECTION_SUFFIX}")
-    
+
     # 1. Migrate local data if any
     try:
         storage_service.migrate_local_data()

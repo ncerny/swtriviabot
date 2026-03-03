@@ -187,15 +187,16 @@ class TestArchiveSession:
         )
         mock_storage.load_session.return_value = session
 
-        result = answer_service.archive_session("guild123")
+        result = answer_service.archive_session("guild123", winners=["Alice"])
 
         assert result is not None
         assert result.guild_id == "guild123"
         assert result.question_text == "What is 2+2?"
         assert len(result.answers) == 1
+        assert result.winners == ["Alice"]
         assert result.answers["user1"].text == "4"
         mock_storage.save_archived_session.assert_called_once()
-        mock_storage.prune_archived_sessions.assert_called_once_with("guild123", keep=3)
+        mock_storage.prune_archived_sessions.assert_called_once_with("guild123", keep=8)
 
     @patch("src.services.answer_service.storage_service")
     def test_returns_none_when_no_session(self, mock_storage):
@@ -230,3 +231,4 @@ class TestArchiveSession:
 
         assert result is not None
         assert result.question_text == ""
+        assert result.winners == []

@@ -1,4 +1,4 @@
-"""Slash command handler for /post-question command."""
+"""Slash command handlers for posting trivia questions."""
 
 import asyncio
 import logging
@@ -13,7 +13,7 @@ import aiohttp
 # Load environment variables from .env file
 load_dotenv()
 
-from src.services import answer_service, storage_service, image_service
+from src.services import answer_service, storage_service, image_service, weekly_summary_service
 
 logger = logging.getLogger(__name__)
 
@@ -466,10 +466,16 @@ class PostQuestionModal(ui.Modal, title="Post Trivia Question"):
             # Get previous answers before resetting
             previous_session = answer_service.get_session(self.guild_id)
 
+            winners_for_archive = weekly_summary_service.parse_winners_text(
+                str(self.yesterday_winners.value)
+            )
+
             # Archive previous session before reset
             archived = None
             if previous_session and previous_session.answers:
-                archived = answer_service.archive_session(self.guild_id)
+                archived = answer_service.archive_session(
+                    self.guild_id, winners=winners_for_archive
+                )
 
             if previous_session and previous_session.answers:
                 # Format previous answers
@@ -808,12 +814,12 @@ class AnswerButton(ui.View):
 
 
 @app_commands.command(
-    name="post-question",
+    name="trivia-post",
     description="Post a trivia question with previous results (Admin only)",
 )
 @app_commands.default_permissions(administrator=True)
 async def post_question_command(interaction: discord.Interaction) -> None:
-    """Handle the /post-question slash command by opening a modal.
+    """Handle the /trivia-post slash command by opening a modal.
 
     Args:
         interaction: Discord interaction object
@@ -856,3 +862,13 @@ async def post_question_command(interaction: discord.Interaction) -> None:
             logger.error("Interaction expired before command error message", exc_info=True)
         except Exception as followup_error:
             logger.error(f"Failed to send command error message: {followup_error}", exc_info=True)
+
+
+@app_commands.command(
+    name="post-question",
+    description="Alias for /trivia-post (Admin only)",
+)
+@app_commands.default_permissions(administrator=True)
+async def post_question_alias_command(interaction: discord.Interaction) -> None:
+    """Temporary alias for /trivia-post."""
+    await post_question_command(interaction)

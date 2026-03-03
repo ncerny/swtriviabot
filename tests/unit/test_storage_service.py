@@ -8,6 +8,7 @@ from src.services import storage_service
 from src.models.session import TriviaSession
 from src.models.answer import Answer
 from src.models.archived_session import ArchivedSession
+from src.models.weekly_summary_subscription import WeeklySummarySubscription
 
 
 def test_save_session_to_firestore(mock_firestore):
@@ -428,3 +429,54 @@ class TestPruneArchivedSessions:
         mock_get_db.return_value = None
         # Should not raise
         storage_service.prune_archived_sessions("guild123", keep=3)
+
+
+class TestWeeklySummarySubscriptions:
+    """Tests for weekly summary subscription persistence."""
+
+    def test_save_weekly_summary_subscription(self, mock_firestore):
+        now = datetime.now(timezone.utc)
+        subscription = WeeklySummarySubscription(
+            guild_id="guild123",
+            user_id="user123",
+            weekday=0,
+            hour=9,
+            minute=30,
+            next_send_at=now,
+            created_at=now,
+            updated_at=now,
+        )
+
+        storage_service.save_weekly_summary_subscription(subscription)
+
+        mock_firestore["db"].collection.assert_called_with(
+            f"weekly_summary_subscriptions{storage_service.COLLECTION_SUFFIX}"
+        )
+        mock_firestore["collection"].document.assert_called_with("guild123_user123")
+        mock_firestore["document"].set.assert_called_once()
+
+    def test_load_due_weekly_summary_subscriptions(self, mock_firestore):
+        now = datetime.now(timezone.utc)
+        mock_doc = MagicMock()
+        mock_doc.to_dict.return_value = {
+            "guild_id": "guild123",
+            "user_id": "user123",
+            "weekday": 0,
+            "hour": 9,
+            "minute": 30,
+            "next_send_at": now.isoformat(),
+            "created_at": now.isoformat(),
+            "updated_at": now.isoformat(),
+        }
+
+        mock_query = MagicMock()
+        mock_query.where.return_value = mock_query
+        mock_query.order_by.return_value = mock_query
+        mock_query.limit.return_value = mock_query
+        mock_query.stream.return_value = [mock_doc]
+        mock_firestore["db"].collection.return_value = mock_query
+
+        result = storage_service.load_due_weekly_summary_subscriptions(now=now, limit=10)
+        assert len(result) == 1
+        assert result[0].guild_id == "guild123"
+        assert result[0].user_id == "user123"

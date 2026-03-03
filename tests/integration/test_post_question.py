@@ -392,7 +392,7 @@ class TestPostQuestionArchiveAndDM:
 
         await modal.on_submit(mock_interaction)
 
-        mock_answer_svc.archive_session.assert_called_once_with("987654321098765432")
+        mock_answer_svc.archive_session.assert_called_once_with("987654321098765432", winners=[])
 
     @patch("src.commands.post_question.answer_service")
     @patch("src.commands.post_question.storage_service")

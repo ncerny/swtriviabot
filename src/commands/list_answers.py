@@ -1,4 +1,4 @@
-"""Slash command handler for /list-answers command."""
+"""Slash command handlers for list command aliases."""
 
 import logging
 
@@ -11,12 +11,12 @@ logger = logging.getLogger(__name__)
 
 
 @app_commands.command(
-    name="list-answers",
+    name="trivia-list",
     description="View all submitted answers (Admin only)",
 )
 @app_commands.checks.has_permissions(administrator=True)
 async def list_answers_command(interaction: discord.Interaction) -> None:
-    """Handle the /list-answers slash command.
+    """Handle the /trivia-list slash command.
 
     Args:
         interaction: Discord interaction object
@@ -60,16 +60,16 @@ async def list_answers_command(interaction: discord.Interaction) -> None:
             except discord.errors.NotFound:
                 logger.error("Interaction expired before empty answers message", exc_info=True)
             except Exception as e:
-                logger.error(f"Failed to send empty answers message in /list-answers: {e}", exc_info=True)
+                logger.error(
+                    f"Failed to send empty answers message in /list-answers: {e}", exc_info=True
+                )
             return
 
         # Format answer list to match post-question style
         answer_lines = []
         for answer in session.answers.values():
             timestamp_str = answer.timestamp.strftime("%Y-%m-%d %H:%M UTC")
-            answer_lines.append(
-                f"**{answer.username}** ({timestamp_str}):\n{answer.text}\n"
-            )
+            answer_lines.append(f"**{answer.username}** ({timestamp_str}):\n{answer.text}\n")
 
         # Split into multiple messages if needed (Discord has 2000 char limit per message)
         # Keep header and footer separate from answers
@@ -130,8 +130,8 @@ async def list_answers_command(interaction: discord.Interaction) -> None:
             extra={
                 "guild_id": interaction.guild_id,
                 "channel_id": interaction.channel_id,
-                "user_id": interaction.user.id
-            }
+                "user_id": interaction.user.id,
+            },
         )
         try:
             await interaction.followup.send(
@@ -141,10 +141,24 @@ async def list_answers_command(interaction: discord.Interaction) -> None:
         except discord.errors.NotFound:
             logger.error("Interaction expired before error message", exc_info=True)
         except Exception as followup_error:
-            logger.error(f"Failed to send error message in /list-answers: {followup_error}", exc_info=True)
+            logger.error(
+                f"Failed to send error message in /list-answers: {followup_error}",
+                exc_info=True,
+            )
+
+
+@app_commands.command(
+    name="list-answers",
+    description="Alias for /trivia-list (Admin only)",
+)
+@app_commands.checks.has_permissions(administrator=True)
+async def list_answers_alias_command(interaction: discord.Interaction) -> None:
+    """Temporary alias for /trivia-list."""
+    await list_answers_command(interaction)
 
 
 @list_answers_command.error
+@list_answers_alias_command.error
 async def list_answers_error(
     interaction: discord.Interaction, error: app_commands.AppCommandError
 ) -> None:
@@ -160,15 +174,15 @@ async def list_answers_error(
         extra={
             "guild_id": interaction.guild_id,
             "user_id": interaction.user.id,
-            "error_type": type(error).__name__
-        }
+            "error_type": type(error).__name__,
+        },
     )
-    
+
     if isinstance(error, app_commands.MissingPermissions):
         error_message = "❌ You don't have permission to use this command (Administrator required)"
     else:
         error_message = "❌ Something went wrong, please try again"
-    
+
     try:
         if not interaction.response.is_done():
             await interaction.response.send_message(error_message, ephemeral=True)

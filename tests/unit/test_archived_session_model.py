@@ -24,12 +24,14 @@ class TestArchivedSessionInit:
             guild_id="guild123",
             question_text="What is 2+2?",
             answers=answers,
+            winners=["Alice"],
             created_at=now,
             archived_at=now,
         )
         assert session.guild_id == "guild123"
         assert session.question_text == "What is 2+2?"
         assert len(session.answers) == 1
+        assert session.winners == ["Alice"]
         assert session.created_at == now
         assert session.archived_at == now
 
@@ -40,6 +42,7 @@ class TestArchivedSessionInit:
                 guild_id="",
                 question_text="Q",
                 answers={},
+                winners=[],
                 created_at=now,
                 archived_at=now,
             )
@@ -51,6 +54,7 @@ class TestArchivedSessionInit:
             guild_id="guild123",
             question_text="",
             answers={},
+            winners=[],
             created_at=now,
             archived_at=now,
         )
@@ -80,6 +84,7 @@ class TestArchivedSessionSerialization:
             guild_id="guild456",
             question_text="Capital of France?",
             answers=answers,
+            winners=["Alice", "Bob"],
             created_at=now,
             archived_at=now,
         )
@@ -89,6 +94,7 @@ class TestArchivedSessionSerialization:
         data = session.to_dict()
         assert data["guild_id"] == "guild456"
         assert data["question_text"] == "Capital of France?"
+        assert data["winners"] == ["Alice", "Bob"]
         assert "user1" in data["answers"]
         assert "user2" in data["answers"]
         assert isinstance(data["created_at"], str)
@@ -100,6 +106,7 @@ class TestArchivedSessionSerialization:
         restored = ArchivedSession.from_dict(data)
         assert restored.guild_id == original.guild_id
         assert restored.question_text == original.question_text
+        assert restored.winners == original.winners
         assert len(restored.answers) == len(original.answers)
         assert restored.answers["user1"].text == "Paris"
         assert restored.answers["user2"].text == "London"
@@ -109,6 +116,7 @@ class TestArchivedSessionSerialization:
         data = {
             "guild_id": "guild789",
             "question_text": "Q?",
+            "winners": [],
             "answers": {},
             "created_at": now.isoformat(),
             "archived_at": now.isoformat(),
@@ -116,6 +124,20 @@ class TestArchivedSessionSerialization:
         session = ArchivedSession.from_dict(data)
         assert session.guild_id == "guild789"
         assert len(session.answers) == 0
+        assert session.winners == []
+
+    def test_from_dict_defaults_winners_when_missing(self):
+        now = datetime.now(timezone.utc)
+        data = {
+            "guild_id": "guild999",
+            "question_text": "Q?",
+            "answers": {},
+            "created_at": now.isoformat(),
+            "archived_at": now.isoformat(),
+        }
+
+        session = ArchivedSession.from_dict(data)
+        assert session.winners == []
 
 
 class TestArchivedSessionDocId:
@@ -127,6 +149,7 @@ class TestArchivedSessionDocId:
             guild_id="guild123",
             question_text="Q",
             answers={},
+            winners=[],
             created_at=now,
             archived_at=now,
         )

@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 # Session TTL: 7 days (safety net in case questions aren't posted regularly)
 SESSION_TTL_DAYS = 7
+ARCHIVE_RETENTION_ROUNDS = 8
 
 
 def _cleanup_stale_sessions() -> None:
@@ -128,7 +129,9 @@ def load_sessions(sessions: dict[str, TriviaSession]) -> None:
     pass
 
 
-def archive_session(guild_id: str) -> Optional[ArchivedSession]:
+def archive_session(
+    guild_id: str, winners: Optional[list[str]] = None
+) -> Optional[ArchivedSession]:
     """Archive the current session before reset.
 
     Saves a snapshot of the session to the archive collection,
@@ -136,6 +139,7 @@ def archive_session(guild_id: str) -> Optional[ArchivedSession]:
 
     Args:
         guild_id: Discord server/guild ID
+        winners: Optional list of winners for this archived round
 
     Returns:
         ArchivedSession if archived, None if nothing to archive
@@ -150,9 +154,10 @@ def archive_session(guild_id: str) -> Optional[ArchivedSession]:
         answers=dict(session.answers),
         created_at=session.created_at,
         archived_at=datetime.now(timezone.utc),
+        winners=list(winners or []),
     )
 
     storage_service.save_archived_session(archived)
-    storage_service.prune_archived_sessions(guild_id, keep=3)
+    storage_service.prune_archived_sessions(guild_id, keep=ARCHIVE_RETENTION_ROUNDS)
 
     return archived
