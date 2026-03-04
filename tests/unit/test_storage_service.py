@@ -2,7 +2,7 @@
 
 import pytest
 from unittest.mock import MagicMock, patch, call
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from src.services import storage_service
 from src.models.session import TriviaSession
@@ -369,6 +369,67 @@ class TestLoadArchivedSessions:
         assert len(result) == 1
         assert result[0].guild_id == "guild123"
 
+    def test_falls_back_when_index_missing(self, mock_firestore):
+        now = datetime.now(timezone.utc)
+        newest = now.isoformat()
+        middle = (now.replace(microsecond=0)).isoformat()
+        oldest = (now.replace(microsecond=0) - timedelta(days=1)).isoformat()
+
+        failing_query = MagicMock()
+        failing_query.where.return_value = failing_query
+        failing_query.order_by.return_value = failing_query
+        failing_query.limit.return_value = failing_query
+        failing_query.stream.side_effect = Exception("The query requires an index")
+
+        # Fallback full scan docs
+        doc_a = MagicMock()
+        doc_a.to_dict.return_value = {
+            "guild_id": "guild123",
+            "question_text": "Q1",
+            "answers": {},
+            "winners": ["Alice"],
+            "created_at": oldest,
+            "archived_at": oldest,
+        }
+        doc_b = MagicMock()
+        doc_b.to_dict.return_value = {
+            "guild_id": "guild999",
+            "question_text": "Other guild",
+            "answers": {},
+            "winners": ["Other"],
+            "created_at": newest,
+            "archived_at": newest,
+        }
+        doc_c = MagicMock()
+        doc_c.to_dict.return_value = {
+            "guild_id": "guild123",
+            "question_text": "Q2",
+            "answers": {},
+            "winners": ["Bob"],
+            "created_at": newest,
+            "archived_at": newest,
+        }
+        doc_d = MagicMock()
+        doc_d.to_dict.return_value = {
+            "guild_id": "guild123",
+            "question_text": "Q3",
+            "answers": {},
+            "winners": ["Carol"],
+            "created_at": middle,
+            "archived_at": middle,
+        }
+
+        mock_collection = MagicMock()
+        mock_collection.where.return_value = failing_query
+        mock_collection.stream.return_value = [doc_a, doc_b, doc_c, doc_d]
+        mock_firestore["db"].collection.return_value = mock_collection
+
+        result = storage_service.load_archived_sessions("guild123", limit=2)
+        assert len(result) == 2
+        # Sorted by archived_at descending, filtered to guild123
+        assert result[0].question_text == "Q2"
+        assert result[1].question_text == "Q3"
+
     @patch("src.services.storage_service._get_db")
     def test_handles_none_db(self, mock_get_db):
         mock_get_db.return_value = None
@@ -423,6 +484,66 @@ class TestPruneArchivedSessions:
 
         for doc in mock_docs:
             doc.reference.delete.assert_not_called()
+
+    def test_falls_back_when_index_missing(self, mock_firestore):
+        now = datetime.now(timezone.utc)
+        newest = now.isoformat()
+        middle = (now - timedelta(hours=1)).isoformat()
+        oldest = (now - timedelta(hours=2)).isoformat()
+
+        failing_query = MagicMock()
+        failing_query.where.return_value = failing_query
+        failing_query.order_by.return_value = failing_query
+        failing_query.stream.side_effect = Exception("The query requires an index")
+
+        doc_new = MagicMock()
+        doc_new.reference = MagicMock()
+        doc_new.to_dict.return_value = {
+            "guild_id": "guild123",
+            "question_text": "Newest",
+            "answers": {},
+            "created_at": newest,
+            "archived_at": newest,
+        }
+        doc_middle = MagicMock()
+        doc_middle.reference = MagicMock()
+        doc_middle.to_dict.return_value = {
+            "guild_id": "guild123",
+            "question_text": "Middle",
+            "answers": {},
+            "created_at": middle,
+            "archived_at": middle,
+        }
+        doc_old = MagicMock()
+        doc_old.reference = MagicMock()
+        doc_old.to_dict.return_value = {
+            "guild_id": "guild123",
+            "question_text": "Old",
+            "answers": {},
+            "created_at": oldest,
+            "archived_at": oldest,
+        }
+        doc_other = MagicMock()
+        doc_other.reference = MagicMock()
+        doc_other.to_dict.return_value = {
+            "guild_id": "guild999",
+            "question_text": "Other guild",
+            "answers": {},
+            "created_at": newest,
+            "archived_at": newest,
+        }
+
+        mock_collection = MagicMock()
+        mock_collection.where.return_value = failing_query
+        mock_collection.stream.return_value = [doc_new, doc_middle, doc_old, doc_other]
+        mock_firestore["db"].collection.return_value = mock_collection
+
+        storage_service.prune_archived_sessions("guild123", keep=2)
+
+        doc_old.reference.delete.assert_called_once()
+        doc_new.reference.delete.assert_not_called()
+        doc_middle.reference.delete.assert_not_called()
+        doc_other.reference.delete.assert_not_called()
 
     @patch("src.services.storage_service._get_db")
     def test_handles_none_db(self, mock_get_db):

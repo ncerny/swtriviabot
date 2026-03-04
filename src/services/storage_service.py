@@ -35,6 +35,36 @@ logger.info(f"  Collection suffix: '{COLLECTION_SUFFIX}'")
 _db = None
 
 
+def _is_missing_index_error(error: Exception) -> bool:
+    """Return True when Firestore error indicates a missing composite index."""
+    return "requires an index" in str(error).lower()
+
+
+def _load_archived_sessions_fallback(
+    db,
+    collection: str,
+    guild_id: str,
+    limit: Optional[int] = None,
+) -> list[ArchivedSession]:
+    """Fallback archive lookup that scans the collection and filters client-side."""
+    results = []
+    for doc in db.collection(collection).stream():
+        try:
+            archived = ArchivedSession.from_dict(doc.to_dict())
+        except Exception as e:
+            logger.error(f"Error parsing archived session {doc.id} during fallback: {e}")
+            continue
+
+        if archived.guild_id != guild_id:
+            continue
+        results.append(archived)
+
+    results.sort(key=lambda archived: archived.archived_at, reverse=True)
+    if limit is not None:
+        return results[:limit]
+    return results
+
+
 def _get_db():
     """Get or initialize Firestore client."""
     global _db
@@ -237,6 +267,18 @@ def load_archived_sessions(guild_id: str, limit: int = 3) -> list[ArchivedSessio
                 logger.error(f"Error parsing archived session {doc.id}: {e}")
         return results
     except Exception as e:
+        if _is_missing_index_error(e):
+            logger.warning(
+                "Missing Firestore index for archived session query; using fallback scan for guild %s",
+                guild_id,
+            )
+            collection = f"session_archives{COLLECTION_SUFFIX}"
+            return _load_archived_sessions_fallback(
+                db=db,
+                collection=collection,
+                guild_id=guild_id,
+                limit=limit,
+            )
         logger.error(f"Error loading archived sessions for guild {guild_id}: {e}")
         return []
 
@@ -263,6 +305,32 @@ def prune_archived_sessions(guild_id: str, keep: int = 3) -> None:
         for doc in docs[keep:]:
             doc.reference.delete()
     except Exception as e:
+        if _is_missing_index_error(e):
+            logger.warning(
+                "Missing Firestore index for archive pruning; using fallback scan for guild %s",
+                guild_id,
+            )
+            collection = f"session_archives{COLLECTION_SUFFIX}"
+            docs_with_timestamps = []
+            for doc in db.collection(collection).stream():
+                data = doc.to_dict() or {}
+                if str(data.get("guild_id")) != guild_id:
+                    continue
+                try:
+                    archived_session = ArchivedSession.from_dict(data)
+                except Exception as parse_error:
+                    logger.error(
+                        "Error parsing archived session %s during prune fallback: %s",
+                        doc.id,
+                        parse_error,
+                    )
+                    continue
+                docs_with_timestamps.append((archived_session.archived_at, doc))
+
+            docs_with_timestamps.sort(key=lambda row: row[0], reverse=True)
+            for _, doc in docs_with_timestamps[keep:]:
+                doc.reference.delete()
+            return
         logger.error(f"Error pruning archived sessions for guild {guild_id}: {e}")
 
 
